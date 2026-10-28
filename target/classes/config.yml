@@ -1,0 +1,827 @@
+# ==============================================================
+#                 JavaStudio Configuration File
+#   Hỗ trợ Paper, Purpur, Spigot, Folia từ phiên bản 1.20.5 đến 26.3+
+# ==============================================================
+
+# ==============================================================
+# 0. QUẢN LÝ CÁC MODULE & TÍNH NĂNG (MODULE TOGGLES)
+# Bật (true) hoặc Tắt (false) các module theo nhu cầu của máy chủ.
+# Tắt những module không cần dùng giúp tối ưu RAM, CPU, giải phóng cổng mạng
+# và giảm thiểu tối đa các tác vụ ngầm không mong muốn chạy trên server!
+# ==============================================================
+modules:
+  # Trình thực thi mã Java trực tiếp 1 dòng (/jexec, /java)
+  # [Tiết kiệm]: Tắt nếu bạn không muốn ai chạy lệnh Java trực tiếp trong game
+  direct-exec: true
+
+  # Hệ thống Dynamic Plugins (/jplugin) - biên dịch và nạp plugin động
+  # [Tiết kiệm]: Tắt nếu bạn không dùng thư mục projects/ để tạo plugin
+  dynamic-plugins: true
+
+  # Quản lý & chạy các file Java script độc lập (/jscript)
+  # [Tiết kiệm]: Tắt nếu không dùng script trong thư mục scripts/
+  script-manager: true
+
+  # Kiểm soát & can thiệp toàn bộ plugin bên ngoài như PlugManX (/jpm, /jcontrol)
+  # [Tiết kiệm]: Tắt nếu server đã có sẵn PlugManX riêng hoặc không cần quản lý plugin ngoài
+  plugin-controller: true
+
+  # Giám sát hiệu năng server, TPS, MSPT, RAM, CPU & dọn quái vật (/jserver)
+  # [Tiết kiệm]: Tắt để không lấy mẫu hiệu năng định kỳ trên main thread
+  server-monitor: true
+
+  # Ứng cứu quá tải tự động (Auto-Mitigation Engine)
+  # [Tiết kiệm]: Mặc định TẮT. Khi bật, tự động hạ tầm nhìn & dọn quái khi MSPT/TPS quá tải
+  auto-mitigation: false
+
+  # Hot-Reload File Watcher (Tự động biên dịch lại khi lưu file trên đĩa)
+  # [Tiết kiệm]: Tắt sẽ dừng thread WatchService, giảm 100% I/O ổ đĩa nền
+  file-watcher: true
+
+  # Xuất plugin ra file JAR độc lập (/jplugin export)
+  # [Tiết kiệm]: Tắt nếu server production chỉ chạy chứ không cần xuất file JAR
+  plugin-exporter: true
+
+  # Gửi log và cảnh báo bảo mật về Discord Webhook
+  # [Tiết kiệm]: Tắt sẽ không gửi HTTP Request ra ngoài Internet
+  discord-webhook: false
+
+  # Hộp cát bảo mật (Security Sandbox) kiểm tra mã độc & timeout
+  # [Tiết kiệm]: Bật để bảo vệ server; tắt sẽ chạy trực tiếp không qua Executor timeout
+  security-sandbox: true
+
+  # Chợ Plugin & Package Manager trực tuyến (/jplugin market, /jplugin install)
+  marketplace: true
+
+  # Máy quét mã độc & backdoor plugin server (/jpm scan)
+  security-scanner: true
+
+  # Trình dịch ngược & mổ xẻ Bytecode (.class) (/jpm inspect)
+  bytecode-inspector: true
+
+  # Engine hiển thị Holograms, Scoreboard & BossBar tích hợp
+  display-engine: true
+
+  # Chế độ lập trình tương tác trực tiếp qua Chat (/java repl)
+  interactive-repl: true
+
+  # Đồng bộ cụm máy chủ đa server (Multi-Server Sync)
+  network-sync: false
+
+  # Plugin Profiler & Giám sát Lag Spikes (/jplugin profile)
+  plugin-profiler: true
+
+  # Đồng bộ cụm máy chủ qua Redis Pub/Sub
+  redis-sync: false
+
+  # Bảo vệ máy chủ & chống exploit (ExploitFixer)
+  exploit-fixer: true
+
+  # Hệ thống Anti-Cheat đa năng (Vulcan/Matrix/Grim/Polar-style)
+  # Phát hiện Speed, Fly, KillAura, Reach, Scaffold, Timer, AutoClicker...
+  anti-cheat: true
+
+  # Phòng thủ chuyên sâu Hosting Panels (Crafty Controller & Pterodactyl/Wings)
+  # Chống 10+ CVEs khai thác SSTI, LFI, Path Traversal, Stored XSS, Host Injection
+  panel-cve-defense: true
+
+  # Trợ lý lập trình AI Copilot (/jai)
+  # Tự động viết plugin theo mô tả tự nhiên và tự sửa lỗi cú pháp
+  ai-assistant: true
+
+  # Netty Packet Sniffer (/jpacket, /jpkt)
+  # Bắt, theo dõi và giả lập/can thiệp gói tin mạng tầng thấp không cần ProtocolLib
+  packet-sniffer: true
+
+  # Quản lý Resource Pack & Custom Items/Audio (/jpack)
+  # HTTP Server tích hợp cấp phát gói tài nguyên & CustomModelData
+  resource-pack: true
+
+  # Quản lý bản quyền thương mại hóa & Thủy vân chống leak JAR (/jlicense)
+  license-manager: true
+
+  # Giả lập người chơi ảo (Fake Players) & Stress-Test tải server (/jbot, /jb)
+  fake-players: true
+
+  # Thanh tra cây đối tượng & sửa đổi RAM live (Live Heap Inspector - /jheap, /jmem)
+  heap-inspector: true
+
+  # Cầu nối điều hành từ xa & cứu hộ khẩn cấp (/jbridge)
+  remote-bridge: true
+
+  # Khóa bảo mật 2 lớp Google Authenticator (TOTP RFC 6238 - /j2fa, /totp)
+  two-factor-auth: true
+
+  # Cầu chì tự ngắt Circuit Breaker & Hộp đen ngoại lệ (/jtrace, /jt, /jbreaker)
+  # Tự ngắt Listener lỗi hoặc chiếm CPU >40ms để chống sập server
+  circuit-breaker: true
+
+  # Thao tác khối siêu tốc & Nén snapshot đấu trường vào RAM (/jchunk, /jc, /jarena)
+  fast-block: true
+
+  # Thanh HUD theo dõi TPS, MSPT, RAM, Ping thời gian thực (/jhud)
+  debug-hud: true
+
+  # Gián điệp & gỡ lỗi sự kiện Bukkit Event trực tiếp in-game (/jspy)
+  event-spy: true
+
+  # Chẩn đoán hiệu năng tổng hợp & rò rỉ bộ nhớ ClassLoader (/jdiag)
+  telemetry-nexus: true
+
+# ==============================================================
+# 1. DANH SÁCH DYNAMIC PLUGINS TỰ ĐỘNG NẠP KHI SERVER KHỞI ĐỘNG
+# ==============================================================
+auto-load-plugins: []
+
+# ==============================================================
+# 2. CẤU HÌNH CHI TIẾT CÁC MODULE (KHI ĐƯỢC BẬT)
+# ==============================================================
+
+# Redis Distributed Cluster Sync (Mạng đa server Velocity / BungeeCord)
+redis:
+  enabled: false
+  host: "127.0.0.1"
+  port: 6379
+  password: ""
+
+# Hot-Reload File Watcher (Chỉ hoạt động khi modules.file-watcher: true)
+watcher:
+  enabled: true
+  debounce-ms: 600
+
+# ==============================================================
+# ỨNG CỨU QUÁ TẢI TỰ ĐỘNG (AUTO-MITIGATION ENGINE)
+# Mặc định TẮT (disabled), chỉ hoạt động khi bật trong setting hoặc /jdiag mitigate toggle.
+# Tự động phát hiện khi máy chủ bị nghẽn (MSPT vượt ngưỡng hoặc TPS tụt)
+# và tự kích hoạt các kịch bản giảm tải theo các thông số cấu hình dưới đây:
+# ==============================================================
+auto-mitigation:
+  # Kích hoạt hệ thống ứng cứu tự động (Mặc định: false)
+  enabled: false
+
+  # Ngưỡng kích hoạt ứng cứu
+  mspt-threshold: 45.0
+  tps-threshold: 16.5
+
+  # Số giây liên tục bị quá tải trước khi kích hoạt ứng cứu
+  required-lag-seconds: 10
+
+  # Số giây liên tục máy chủ ổn định trước khi khôi phục nguyên trạng
+  required-recovery-seconds: 15
+
+  # Kịch bản 1: Dọn dẹp thực thể rơi rớt và quái vật thù địch khi quá tải
+  purge-entities: true
+
+  # Kịch bản 2: Tự động gọi bộ thu gom rác bộ nhớ JVM (GC)
+  trigger-gc: true
+
+  # Kịch bản 3: Tạm thời thu hẹp tầm nhìn view-distance & simulation-distance
+  scale-view-distance: true
+  view-distance-reduction: 2
+  min-view-distance: 4
+  sim-distance-reduction: 2
+  min-sim-distance: 3
+
+
+# Discord Webhook (Chỉ hoạt động khi modules.discord-webhook: true)
+discord:
+  webhook-url: ""
+  log-jexec: true
+  log-plugin-lifecycle: true
+
+# An ninh và Hộp cát (Security Sandbox)
+security:
+  log-exec-to-file: true
+  allow-unsafe-exec: true
+  sandbox:
+    enabled: true
+    max-execution-ms: 5000
+    blocked-keywords:
+      - "Runtime.getRuntime().halt"
+
+# Trình biên dịch mã nguồn (Runtime JavaCompiler)
+compiler:
+  # Phiên bản Bytecode nhắm tới khi biên dịch động (21, 22, 23, 24, 25,...; mặc định 21 để tương thích toàn bộ server Java 21+)
+  target-release: 21
+  options:
+    - "-parameters"
+    - "-Xlint:none"
+
+# ==============================================================
+# 3. BẢO VỆ MÁY CHỦ & CHỐNG EXPLOIT (Tương tự ExploitFixer)
+# Chặn các gói tin phá hoại, sách độc, NBT quá tải, tọa độ vô cực
+# và các công cụ crash/dupe bot trên server.
+# ==============================================================
+exploit-fixer:
+  enabled: true
+
+  # Hành động khi phát hiện gian lận (KICK, CANCEL, NOTIFY)
+  action: "KICK"
+  violation-threshold-to-kick: 10
+  violation-decay-seconds: 30
+  notify-admins: true
+  discord-alert: true
+
+  # 1. Chống spam gói tin & click inventory (Anti-Packet & Click Lag/Dupe)
+  packets:
+    enabled: true
+    max-clicks-per-sec: 40
+    max-interacts-per-sec: 35
+    max-commands-per-sec: 8
+    max-chat-per-sec: 5
+    max-swaps-per-sec: 20
+    max-drops-per-sec: 15
+    max-entity-interacts-per-sec: 25
+    block-invalid-slots: true
+    block-lectern-crash: true
+
+  # 2. Chống NBT quá tải, Sách độc & Chunk Ban (Anti-NBT & Book Crash)
+  nbt:
+    enabled: true
+    max-book-pages: 50
+    max-book-chars-per-page: 1024
+    max-item-name-length: 128
+    max-item-lore-lines: 50
+    max-item-lore-chars: 2048
+    strip-illegal-json: true
+
+  # 3. Chống tọa độ vô cực, Chunk Crasher & Boat Fly (Anti-Movement Crash)
+  movement:
+    enabled: true
+    max-coordinate: 30000000.0
+    check-nan-infinity: true
+    max-vehicle-speed: 150.0
+    prevent-portal-dupe: true
+
+  # 4. Chống lệnh crash & cú pháp độc hại (Anti-Command Crash)
+  commands:
+    enabled: true
+    max-command-length: 256
+    blocked-syntax:
+      - "//calc"
+      - "/worldedit:/calc"
+      - "/execute in"
+
+  # 5. Chống Sign Crash (Anti-Sign Crash)
+  signs:
+    enabled: true
+    max-line-length: 128
+
+# ==============================================================
+# 5. HỆ THỐNG ANTI-CHEAT (VULCAN / GRIM / MATRIX / POLAR STYLE)
+# Tích hợp bảo vệ toàn diện Di chuyển, Chiến đấu, Tương tác thế giới
+# Có hệ thống Setback, Buffer chống báo động giả (False-Positive),
+# Tự động giảm điểm phạt (Decay) và hỗ trợ đa nền tảng (Paper, Purpur, Folia)
+# ==============================================================
+anticheat:
+  enabled: true
+
+  # Quyền miễn trừ kiểm tra hoàn toàn
+  bypass-permission: "javastudio.ac.bypass"
+
+  # Tự động miễn trừ người có quyền OP (Mặc định: true).
+  # LƯU Ý KHI KIỂM THỬ HACK (TESTING):
+  # - Nếu bạn có OP, hãy gõ lệnh: /jac test để bật chế độ tự quét bản thân (quét cả OP/bypass).
+  # - Hoặc gõ lệnh: /jac exemptops off để tắt bỏ qua OP cho toàn server.
+  exempt-ops: true
+
+  # Danh sách thế giới tắt hoàn toàn Anti-Cheat (ví dụ: world_creative, lobby)
+  disabled-worlds: []
+
+  # Cấu hình cảnh báo vi phạm
+  alerts:
+    enabled: true
+    permission: "javastudio.ac.alerts"
+    min-vl: 1.0
+    throttle-ms: 1500
+    format: "&8[&c&lAC-V2&8] &c[!] &f%player% &7vượt mốc Pro: &e%check% &8(&f%detail%&8) &cVL %vl%/%max% &8[&b%ping%ms&8]"
+    console: true
+    discord: false
+    discord-min-vl: 5.0
+
+  # Cơ chế giảm điểm phạt theo thời gian (Decay)
+  violations:
+    decay-seconds: 30
+    decay-amount: 1.0
+    reset-on-punish: true
+
+  # Xử phạt khi vượt ngưỡng vi phạm (Max-VL)
+  punishments:
+    default-commands:
+      - "kick %player% &c[AntiCheat] Phát hiện gian lận %check% (VL %vl%)"
+    kick-message: "&c[AntiCheat] Bạn bị kick do nghi ngờ gian lận (%check%)"
+    cooldown-ms: 5000
+
+  # Cơ chế chống bắt nhầm do giật lag / mạng chậm (Exemptions & Grace)
+  exemptions:
+    min-tps: 18.0
+    max-ping: 700
+    join-grace-ms: 3000
+    teleport-grace-ms: 1200
+    velocity-grace-ms: 1800
+    lag-spike-ms: 150
+    lag-grace-ms: 2000
+
+  # Nhật ký ghi log
+  logging:
+    memory-lines: 300
+    file: true
+    debug-console: false
+
+  # Bẫy AuraBot tàng hình (Hướng 1: Invisible KillAura / AimAssist Trap)
+  # Triển khai bot tàng hình ở điểm mù 180° sau lưng nghi phạm để bẫy cheat snap và đánh trúng
+  aurabot:
+    enabled: true
+    auto-spawn: true
+    vl-trigger: 4.0
+    duration-ticks: 120
+
+  # Cổng Web Quản Trị & Live 3D Radar (Hướng 2: Web Dashboard)
+  # Tích hợp máy chủ HTTP siêu nhẹ port 8085, xem TPS, MSPT, CPS, Ping, VL và Live Radar
+  web-dashboard:
+    enabled: true
+    port: 8085
+    auth-token: "admin123"
+
+  # Bẫy Quặng Ảo & Chống X-Ray / Freecam (Hướng 2 mới: Honeypot Ore Engine)
+  xray:
+    enabled: true
+    max-ore-ratio: 0.05
+
+  # Hệ Thống Ban Theo Đợt (Hướng 3 mới: Ban Wave System)
+  ban-wave:
+    enabled: true
+    auto-execute: true
+    interval-minutes: 45
+    commands:
+      - "ban %player% &c[AntiCheat Ban-Wave] Gian lận bị phát hiện: %check%"
+
+  # ============================================================
+  # CẤU HÌNH TỪNG CHECK CHI TIẾT (CHECKS CONFIGURATION)
+  # ============================================================
+  checks:
+    # --- DI CHUYỂN (MOVEMENT) ---
+    speed:
+      enabled: true
+      max-vl: 14.0
+      setback: true
+      buffer-limit: 3.0
+      max-horizontal: 0.0
+
+    fly:
+      enabled: true
+      max-vl: 10.0
+      setback: true
+      buffer-limit: 2.0
+
+    jump:
+      enabled: true
+      max-vl: 10.0
+      setback: true
+      buffer-limit: 2.0
+
+    nofall:
+      enabled: true
+      max-vl: 8.0
+      setback: false
+
+    jesus:
+      enabled: true
+      max-vl: 10.0
+      setback: true
+
+    timer:
+      enabled: true
+      max-vl: 12.0
+      setback: true
+      max-balance: 200.0
+      buffer-limit: 4.0
+
+    noslow:
+      enabled: true
+      max-vl: 12.0
+      setback: true
+
+    phase:
+      enabled: true
+      max-vl: 6.0
+      setback: true
+
+    invalidmove:
+      enabled: true
+      max-vl: 6.0
+      setback: true
+
+    sprint:
+      enabled: true
+      max-vl: 12.0
+      setback: true
+
+    elytra:
+      enabled: true
+      max-vl: 10.0
+      setback: true
+      # Tốc độ lượn/bổ nhào tối đa cơ bản (block/tick, ~3.6 = 72m/s, pháo hoa tự động mở rộng lên 5.5+)
+      max-speed: 3.6
+      # Số tick vi phạm liên tiếp tối thiểu trước khi flag (tránh lag spike)
+      buffer-limit: 4.0
+
+    velocity:
+      enabled: true
+      max-vl: 8.0
+      setback: false
+
+    fastclimb:
+      enabled: true
+      max-vl: 10.0
+      setback: true
+
+    # Hướng 3: Chống BoatFly, Vehicle Speed & Vehicle Phase
+    vehicle:
+      enabled: true
+      max-vl: 8.0
+      setback: true
+      cancel-event: true
+
+    # --- CHIẾN ĐẤU (COMBAT V2) ---
+    reach:
+      enabled: true
+      max-vl: 10.0
+      cancel-event: true
+      # Tầm đánh cơ sở tối đa (mốc Pro Survival: 3.05m, tự động bù thêm ping và đà giật lùi, >3.45m là phi thực tế)
+      max-reach: 3.05
+
+    killaura:
+      enabled: true
+      max-vl: 10.0
+      cancel-event: true
+
+    wallhit:
+      enabled: true
+      max-vl: 8.0
+      cancel-event: true
+
+    aim:
+      enabled: true
+      max-vl: 10.0
+      cancel-event: false
+
+    autoclicker:
+      enabled: true
+      max-vl: 10.0
+      cancel-event: false
+      # Ngưỡng CPS tối đa (mốc Pro Butterfly: 18-20 CPS, >22 CPS hoặc CPS >=14 với StdDev < 4.2ms là phi thực tế)
+      max-cps: 20
+
+    noswing:
+      enabled: true
+      max-vl: 10.0
+      cancel-event: false
+
+    criticals:
+      enabled: true
+      max-vl: 10.0
+      cancel-event: false
+
+    multiactions:
+      enabled: true
+      max-vl: 10.0
+      cancel-event: true
+
+    hitbox:
+      enabled: true
+      max-vl: 8.0
+      cancel-event: true
+
+    autototem:
+      enabled: true
+      max-vl: 6.0
+      cancel-event: true
+
+    # --- THẾ GIỚI & TƯƠNG TÁC (WORLD) ---
+    fastbreak:
+      enabled: true
+      max-vl: 10.0
+      cancel-event: true
+      max-per-second: 14
+
+    nuker:
+      enabled: true
+      max-vl: 8.0
+      cancel-event: true
+
+    fastplace:
+      enabled: true
+      max-vl: 10.0
+      cancel-event: true
+      max-per-second: 12
+
+    # Scaffold V2: Chống bắt cầu gian lận (Baritone, Meteor, LiquidBounce, Wurst, Aristois...)
+    # Tự động phát hiện: Raycast Line-of-sight (Silent Rotation), Sprint-Bridging qua vực,
+    # Impossible Down Face, Pitch Anomaly (<48° dưới chân) và Behind-Back placement.
+    # cancel-event: true sẽ lập tức xóa khối ảo làm hacker rơi ngay xuống vực!
+    scaffold:
+      enabled: true
+      max-vl: 10.0
+      cancel-event: true
+
+    airplace:
+      enabled: true
+      max-vl: 6.0
+      cancel-event: true
+
+    blockreach:
+      enabled: true
+      max-vl: 8.0
+      cancel-event: true
+      max-distance: 5.4
+
+    fasteat:
+      enabled: true
+      max-vl: 8.0
+      cancel-event: true
+
+    fastbow:
+      enabled: true
+      max-vl: 8.0
+      cancel-event: true
+
+    inventory:
+      enabled: true
+      max-vl: 10.0
+      cancel-event: true
+
+    cheststealer:
+      enabled: true
+      max-vl: 8.0
+      cancel-event: true
+      max-clicks-per-sec: 15
+
+    autoarmor:
+      enabled: true
+      max-vl: 8.0
+      cancel-event: true
+
+    badpackets:
+      enabled: true
+      max-vl: 8.0
+      setback: true
+      cancel-event: true
+
+    baritone:
+      enabled: true
+      max-vl: 10.0
+      cancel-event: false
+
+    # Hướng 3: Chống Ping Spoof & Disabler
+    disabler:
+      enabled: true
+      max-vl: 8.0
+      setback: true
+      cancel-event: true
+
+    # Hướng 2 mới: Chống X-Ray & Freecam
+    xray:
+      enabled: true
+      max-vl: 6.0
+      setback: false
+      cancel-event: true
+
+    # Hướng 4 mới: Máy trạng thái túi đồ & Chống Dupe
+    dupe:
+      enabled: true
+      max-vl: 6.0
+      setback: true
+      cancel-event: true
+
+    # Hướng 2 mới: Mô phỏng vật lý & Chống Blink/Timer
+    blink:
+      enabled: true
+      max-vl: 8.0
+      setback: true
+      cancel-event: true
+
+    physics:
+      enabled: true
+      max-vl: 10.0
+      setback: true
+      cancel-event: true
+
+# ==============================================================
+# 5. PHÒNG THỦ HOSTING PANEL & WINGS CVEs (Crafty Controller & Pterodactyl)
+# Khắc phục triệt để 10+ CVEs leo thang đặc quyền, SSTI, LFI, RCE và Stored XSS.
+# ==============================================================
+cve-defense:
+  enabled: true
+
+  # 1. Crafty Controller Safeguards
+  # CVE-2025-14700: SSTI -> RCE qua Webhook Template (CWE-1336)
+  cve-2025-14700-ssti: true
+
+  # CVE-2026-0963: Path traversal qua File Operations API -> RCE (CWE-22)
+  cve-2026-0963-file-traversal: true
+
+  # CVE-2026-13716: Path traversal lồng nhau .../...// qua server import / upload (CWE-35)
+  cve-2026-13716-nested-traversal: true
+
+  # CVE-2026-5652: Giám sát bất thường điều khiển & bảo vệ Control Plane
+  cve-2026-5652-control-plane: true
+
+  # CVE-2025-14701: Stored XSS qua Server MOTD (Làm sạch MOTD trước khi phát ra mạng)
+  cve-2025-14701-motd-xss: true
+
+  # CVE-2025-5990: Stored XSS qua Server Name / API Key form
+  cve-2025-5990-form-xss: true
+
+  # CVE-2024-1064: Host header injection -> DoS (CWE-644/CWE-116)
+  cve-2024-1064-host-header: true
+
+  # 2. Pterodactyl Panel + Wings Safeguards
+  # CVE-2025-49132: Unauthenticated RCE qua /locales/locale.json & pearcmd.php
+  cve-2025-49132-pterodactyl-lfi: true
+
+  # CVE-2024-27102: Wings sandbox escape & symlink traversal ra ngoài container root
+  cve-2024-27102-wings-escape: true
+
+  # CVE-2024-34067: XSS qua import egg malicious / truy cập Wings instance
+  cve-2024-34067-egg-xss: true
+
+  # CVE-2024-49762: Plaintext password leak trong access log khi thao tác 2FA
+  cve-2024-49762-log-redaction: true
+
+  # GHSA-MGR9-6C2J-JXRQ: Zombie Session Reaper & thu hồi quyền tức thời
+  ghsa-mgr9-6c2j-jxrq-session-reaper: true
+
+# ==============================================================
+# 6. TRỢ LÝ LẬP TRÌNH AI COPILOT (/jai)
+# ==============================================================
+ai-assistant:
+  enabled: true
+  # Nhà cung cấp mô hình AI: openai, claude, gemini, ollama (cục bộ)
+  provider: "openai"
+  # URL Endpoint API (Mặc định OpenAI Chat Completions)
+  endpoint: "https://api.openai.com/v1/chat/completions"
+  # Khóa bí mật API Key của nhà cung cấp
+  api-key: ""
+  # Tên mô hình AI (vd: gpt-4o, gpt-4o-mini, claude-3-5-sonnet, gemini-1.5-pro, qwen2.5-coder)
+  model: "gpt-4o-mini"
+  # Thời gian chờ tối đa cho 1 yêu cầu (giây)
+  timeout-seconds: 30
+  # Nhiệt độ sáng tạo (0.0: chính xác, 1.0: sáng tạo)
+  temperature: 0.2
+  # Tự động gửi lại thông báo lỗi javac cho AI để sửa mã nguồn (Self-Healing Loop)
+  self-healing: true
+
+# ==============================================================
+# 7. NETTY PACKET SNIFFER TẦNG THẤP (/jpacket, /jpkt)
+# ==============================================================
+packet-sniffer:
+  enabled: true
+  # Kích thước bộ đệm lưu trữ gói tin gần nhất
+  buffer-size: 500
+  # Ghi nhật ký gói tin bắt được trực tiếp lên console máy chủ
+  log-to-console: false
+  # Bộ lọc mặc định khi khởi động (all, chat, move, interact)
+  default-filter: "all"
+  # Chế độ Deep Listen: phân tích đệ quy toàn bộ trường dữ liệu của gói tin
+  deep-listen: false
+
+# ==============================================================
+# 8. MÁY CHỦ HTTP RESOURCE PACK & TÀI NGUYÊN TÙY BIẾN (/jpack)
+# ==============================================================
+resource-pack:
+  enabled: true
+  # Địa chỉ IP hoặc Hostname của server cấp phát gói
+  host: "localhost"
+  # Cổng HTTP Server chạy ngầm phục vụ tải Resource Pack
+  port: 8088
+  # URL tải tùy biến (bỏ trống để tự động sinh từ host:port)
+  download-url: ""
+  # Tự động gửi gói tài nguyên cho người chơi khi vừa vào server
+  auto-push-on-join: false
+  # Tiêu đề thông báo trên màn hình tải gói của Minecraft client
+  pack-title: "§b§lJavaStudio Enterprise §7- Dynamic Assets Pack"
+  # Bắt buộc người chơi phải chấp nhận tải Resource Pack mới được chơi
+  required: false
+
+# ==============================================================
+# 9. BẢN QUYỀN MÃ HÓA THƯƠNG MẠI & CHỐNG LEAK JAR (/jlicense)
+# ==============================================================
+licensing:
+  enabled: true
+  # Khóa bảo mật HMAC-SHA256 (Hãy đổi chuỗi này để bảo vệ bản quyền độc quyền của bạn)
+  secret-key: "CHANGE_ME_SECRET"
+  # Bắt buộc xác thực đúng địa chỉ IP máy chủ của khách hàng
+  enforce-ip: true
+  # Bắt buộc xác thực đúng cổng kết nối của máy chủ
+  enforce-port: true
+  # Cho phép xác thực chữ ký số offline (không cần máy chủ bản quyền trung tâm)
+  allow-offline-validation: true
+
+# ==============================================================
+# 10. GIẢ LẬP NGƯỜI CHƠI ẢO & STRESS TEST (/jbot, /jb)
+# ==============================================================
+fake-players:
+  enabled: true
+  # Số lượng bot tối đa được phép triệu hồi đồng thời
+  max-bots: 50
+  # Hành vi mặc định của bot: IDLE, WANDER, COMBAT, SPAM_CHAT
+  default-behavior: "IDLE"
+  # Giả lập ping mạng ngẫu nhiên (30ms - 80ms) cho bot
+  ping-simulation: true
+
+# ==============================================================
+# 11. LIVE HEAP INSPECTOR & ĐIỀU HƯỚNG BỘ NHỚ RAM (/jheap, /jmem)
+# ==============================================================
+heap-inspector:
+  enabled: true
+  # Cho phép sửa đổi trực tiếp giá trị biến và thuộc tính trong RAM (/jheap set)
+  allow-set-variables: true
+  # Bật khả năng duyệt sâu cây đối tượng qua Reflection (kể cả private/protected)
+  deep-reflection: true
+  # Độ sâu tối đa khi duyệt cấu trúc dữ liệu đồ thị đối tượng
+  max-depth: 5
+
+# ==============================================================
+# 12. CẦU NỐI ĐIỀU HÀNH TỪ XA & CỨU HỘ KHẨN CẤP (/jbridge)
+# ==============================================================
+remote-bridge:
+  enabled: true
+  # Chuyển tiếp cảnh báo an ninh và anti-cheat về kênh Discord Webhook
+  discord-alerts: true
+  # Tự động dọn rác RAM khẩn cấp khi nhận tín hiệu cứu hộ
+  rescue-auto-gc: true
+  # Gửi cảnh báo Discord khi người chơi bị kick do hack
+  alert-on-ac-kick: true
+  # Gửi cảnh báo Discord khi phát hiện máy chủ bị giật lag (Lag Spikes)
+  alert-on-lag-spike: true
+
+# ==============================================================
+# 13. XÁC THỰC 2 LỚP GOOGLE AUTHENTICATOR (/j2fa, /totp)
+# ==============================================================
+two-factor-auth:
+  enabled: true
+  # Tên tổ chức/máy chủ hiển thị trong ứng dụng Google Authenticator / Authy
+  issuer: "JavaStudio"
+  # Bắt buộc toàn bộ người có quyền OP/Admin phải kích hoạt 2FA
+  enforce-for-ops: false
+  # Thời hạn phiên xác thực (phút) trước khi cần nhập lại mã TOTP (mặc định: 120 phút)
+  session-timeout-minutes: 120
+
+# ==============================================================
+# 14. CẦU CHÌ TỰ NGẮT & HỘP ĐEN NGOẠI LỆ CIRCUIT BREAKER (/jtrace, /jt, /jbreaker)
+# ==============================================================
+circuit-breaker:
+  enabled: true
+  # Ngưỡng số lỗi tối đa mỗi giây trước khi tự động ngắt cúp cầu chì Listener
+  max-errors-per-sec: 15
+  # Ngưỡng thời gian xử lý sự kiện (ms) bị coi là chiếm dụng CPU nghiêm trọng
+  max-mspt-threshold: 40.0
+  # Số lần liên tiếp xử lý chậm trước khi ngắt mạch bảo vệ
+  consecutive-slow-ticks: 5
+  # Thời gian chờ (giây) trước khi tự thử đóng lại cầu chì (HALF_OPEN recovery)
+  recovery-cooldown-seconds: 30
+  # Dung lượng bộ nhớ đệm vòng Ring Buffer lưu trữ ảnh chụp Hộp đen ngoại lệ
+  ring-buffer-size: 50
+
+# ==============================================================
+# 15. THAO TÁC KHỐI SIÊU TỐC & RAM ARENA SNAPSHOTS (/jchunk, /jc, /jarena)
+# ==============================================================
+fast-block:
+  enabled: true
+  # Số lượng khối tối đa xử lý mỗi tick để đảm bảo mượt mà
+  max-blocks-per-tick: 50000
+  # Áp dụng tính toán vật lý láng giềng khi đặt khối (false = siêu tốc độ)
+  apply-physics: false
+  # Nén bảng màu khối LZ77 Palette Compression để tiết kiệm 95% RAM
+  palette-compression: true
+  # Số lượng snapshot đấu trường tối đa được phép lưu trữ trong RAM
+  max-arena-snapshots: 20
+
+# ==============================================================
+# 16. THANH HUD HIỆU NĂNG THỜI GIAN THỰC (/jhud)
+# ==============================================================
+debug-hud:
+  enabled: true
+  # Chế độ hiển thị mặc định: ACTIONBAR hoặc BOSSBAR
+  default-mode: "ACTIONBAR"
+  # Tần suất cập nhật thông số HUD (ticks; 10 ticks = 0.5 giây)
+  refresh-interval-ticks: 10
+
+# ==============================================================
+# 17. GIÁN ĐIỆP & GỠ LỖI SỰ KIỆN IN-GAME EVENT SPY (/jspy)
+# ==============================================================
+event-spy:
+  enabled: true
+  # Số lượng sự kiện tối đa lưu trong bộ nhớ đệm theo dõi
+  max-buffered-events: 200
+
+# ==============================================================
+# 18. CHẨN ĐOÁN HIỆU NĂNG HỢP NHẤT TELEMETRY NEXUS (/jdiag)
+# ==============================================================
+telemetry-nexus:
+  enabled: true
+  # Khoảng thời gian lấy mẫu hiệu năng (giây)
+  sampling-interval-seconds: 5
+  # Bật tính năng tự động phát hiện rò rỉ bộ nhớ ClassLoader sau khi reload plugin
+  leak-detection: true

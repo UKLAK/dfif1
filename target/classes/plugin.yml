@@ -1,0 +1,195 @@
+name: JavaStudio
+version: '1.0.0'
+main: com.javastudio.JavaStudioPlugin
+api-version: '1.20'
+author: Antigravity
+description: Plugin tao plugin dong va thuc thi ma lenh bang ngon ngu Java truc tiep tren Paper, Purpur, Spigot (1.20.5 - 26.3+)
+load: POSTWORLD
+folia-supported: true
+softdepend:
+  - Vault
+  - LuckPerms
+  - ProtocolLib
+  - WorldEdit
+  - Essentials
+  - PlaceholderAPI
+website: https://papermc.io
+
+commands:
+  jexec:
+    description: Thuc thi ma Java truc tiep tu chat hoac console
+    usage: /jexec [-a] [-t] <code...>
+    aliases: [java]
+    permission: javastudio.admin
+  java:
+    description: Alias cua jexec
+    usage: /java <code...>
+    permission: javastudio.admin
+  jplugin:
+    description: Tao, bien dich, nap va quan ly cac Dynamic Plugin
+    usage: /jplugin <create|compile|load|unload|reload|list|templates|info>
+    aliases: [jp]
+    permission: javastudio.admin
+  jscript:
+    description: Quan ly va chay cac file script Java doc lap
+    usage: /jscript <run|list|new>
+    aliases: [js]
+    permission: javastudio.admin
+  javastudio:
+    description: Lenh he thong kiem tra thong tin va reload cau hinh
+    usage: /javastudio [info|reload|help]
+    aliases: [jstudio, jsystem]
+    permission: javastudio.admin
+  jcontrol:
+    description: Kiem soat toan bo plugins (PlugManX) va dieu khien software may chu
+    usage: /jcontrol <list|info|enable|disable|load|unload|reload|status|gc|purge|save>
+    aliases: [jpm, plugman]
+    permission: javastudio.admin
+  jpm:
+    description: Alias quan ly toan bo plugin tren server (PlugManX)
+    usage: /jpm <list|info|enable|disable|load|unload|reload|usage>
+    permission: javastudio.admin
+  jserver:
+    description: Alias giam sat va dieu khien toan bo software may chu
+    usage: /jserver <status|gc|purge|save|cmd>
+    permission: javastudio.admin
+  jnetwork:
+    description: Dieu khien mang da server va dong bo Redis
+    usage: /jnetwork <status|broadcast|exec|redis|proxy>
+    aliases: [jnet]
+    permission: javastudio.admin
+  jexploit:
+    description: Giam sat va dieu khien he thong bao ve chong Exploit (ExploitFixer)
+    usage: /jexploit <status|stats|violations|clear|toggle|reload>
+    aliases: [jprotect, exploitfixer]
+    permission: javastudio.admin
+  jhud:
+    description: Bat tat thanh Debug HUD thoi gian thuc hien thi TPS, MSPT, RAM, Chunks
+    usage: /jhud [toggle|actionbar|bossbar|off]
+    aliases: [hud, jdebug]
+    permission: javastudio.admin
+  jspy:
+    description: Theo doi va go loi cac su kien Bukkit thoi gian thuc trong game (EventSpy)
+    usage: /jspy <listen|stop|stopall|sub|list|filter|cancelled>
+    aliases: [eventspy]
+    permission: javastudio.admin
+  jsecurity:
+    description: Trung tam chi huy an ninh toan dien hop nhat (Security Sentinel)
+    usage: /jsecurity <status|audit|scan|inspect|exploit>
+    aliases: [jprotect]
+    permission: javastudio.admin
+  jdiag:
+    description: Chan doan va giam sat hieu nang hop nhat (Telemetry Nexus)
+    usage: /jdiag <status|gc|hud>
+    aliases: [jperf, jtelemetry]
+    permission: javastudio.admin
+  jac:
+    description: Giam sat, dieu khien va tinh chinh he thong Anti-Cheat (Vulcan/Grim/Matrix-style)
+    usage: /jac <status|alerts|info|reset|checks|toggle|set|logs|exempt|debug|reload>
+    aliases: [anticheat, jstudioac]
+    permission: javastudio.admin
+  jai:
+    description: Tro ly lap trinh AI Copilot sinh ma nguon DynamicPlugin tu dong
+    usage: /jai <generate|ask|reload>
+    aliases: [ai, jcopilot]
+    permission: javastudio.admin
+  jpacket:
+    description: Bat, giam sat va gia lap goi tin mang Netty cap thap (Zero ProtocolLib)
+    usage: /jpacket <status|listen|stop|filter|fakeblock>
+    aliases: [packet, netty]
+    permission: javastudio.admin
+  jpack:
+    description: Quan ly Resource Pack tu dong va API vat pham, am thanh, GUI tuy bien
+    usage: /jpack <status|build|push|list|give|demo>
+    aliases: [pack, jresource]
+    permission: javastudio.admin
+  jlicense:
+    description: Quan ly ban quyen thuong mai cryptographic va thuy van chong ro ri
+    usage: /jlicense <generate|verify|info|trace>
+    aliases: [license, jlic]
+    permission: javastudio.admin
+  jbot:
+    description: Gia lap nguoi choi ao (Fake Players) va Stress-Test tai server
+    usage: /jbot <spawn|action|stresstest|list|remove|clear>
+    aliases: [jb, fakeplayer]
+    permission: javastudio.admin
+  jheap:
+    description: Thanh tra cay doi tuong va bo nho RAM thoi gian thuc (Live Heap Inspector)
+    usage: /jheap <get|set|sizeof|gc>
+    aliases: [jmem, heap]
+    permission: javastudio.admin
+  jbridge:
+    description: Cau noi dieu hanh tu xa va canh bao su co ve Discord
+    usage: /jbridge <status|test|alert|rescue>
+    aliases: [remotebridge, jrescue]
+    permission: javastudio.admin
+  j2fa:
+    description: Xac thuc 2 lop Google Authenticator (TOTP RFC 6238) in-game cho Admin
+    usage: /j2fa <setup|verify|disable|status>
+    aliases: [totp]
+    permission: javastudio.admin
+  jpkt:
+    description: Bat va can thiep goi tin Netty cap thap (Zero ProtocolLib)
+    usage: /jpkt <status|listen|stop|cancel|uncancel|filter|fakeblock>
+    aliases: [pkt]
+    permission: javastudio.admin
+  jtrace:
+    description: Trinh go loi thoi gian thuc va quan ly Cau chi tu ngat (Circuit Breaker)
+    usage: /jtrace <hook|watch|stop|breakers|dump|reset|config>
+    aliases: [jt, jbreaker]
+    permission: javastudio.admin
+  jt:
+    description: Alias cua jtrace
+    usage: /jt <hook|watch|stop|breakers|dump|reset|config>
+    permission: javastudio.admin
+  jbreaker:
+    description: Alias quan ly Circuit Breaker
+    usage: /jbreaker <breakers|reset|config>
+    permission: javastudio.admin
+  jchunk:
+    description: Engine thao tac khoi sieu toc va phuc hoi ban do dau truong trong RAM
+    usage: /jchunk <pos1|pos2|fill|replace|snapshot|restore|list|delete>
+    aliases: [jc, jarena]
+    permission: javastudio.admin
+  jc:
+    description: Alias cua jchunk
+    usage: /jc <pos1|pos2|fill|replace|snapshot|restore|list|delete>
+    permission: javastudio.admin
+  jarena:
+    description: Alias quan ly snapshot dau truong RAM
+    usage: /jarena <snapshot|restore|list>
+    permission: javastudio.admin
+  report:
+    description: To cao nguoi choi nghi van su dung gian lan (Auto Investigation)
+    usage: /report <nguoi_choi> <ly do>
+    aliases: [tocao]
+
+permissions:
+  javastudio.admin:
+    description: Toan quyen su dung moi tinh nang cua JavaStudio
+    default: op
+    children:
+      javastudio.exec: true
+      javastudio.plugin: true
+      javastudio.script: true
+      javastudio.exploit.bypass: true
+      javastudio.ac.bypass: true
+      javastudio.ac.alerts: true
+  javastudio.ac.bypass:
+    description: Bo qua toan bo cac kiem tra gian lan di chuyen, chien dau va the gioi
+    default: op
+  javastudio.ac.alerts:
+    description: Quyen nhan thong bao canh bao vi pham Anti-Cheat thoi gian thuc
+    default: op
+  javastudio.exploit.bypass:
+    description: Bo qua toan bo cac bo loc gioi han va kiem tra exploit
+    default: op
+  javastudio.exec:
+    description: Quyen thuc thi ma Java qua /jexec hoac /java
+    default: op
+  javastudio.plugin:
+    description: Quyen tao va quan ly Dynamic Plugin
+    default: op
+  javastudio.script:
+    description: Quyen chay cac file script Java
+    default: op
