@@ -10,11 +10,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
-/**
- * Trình cầu nối Mạng Đa Cụm (Velocity & BungeeCord Proxy Bridge).
- * Sử dụng Plugin Messaging Channel chuẩn của Minecraft để gửi lệnh, chuyển server người chơi
- * và đồng bộ dữ liệu xuyên mạng (Cross-Server Communication) với Zero external dependencies.
- */
 @SuppressWarnings("this-escape")
 public final class ProxyBridgeManager implements PluginMessageListener {
 
@@ -39,9 +34,6 @@ public final class ProxyBridgeManager implements PluginMessageListener {
         }
     }
 
-    /**
-     * Chuyển một người chơi sang server con khác trong cụm (Lobby, Survival, Minigames...).
-     */
     public boolean sendPlayerToServer(Player player, String targetServer) {
         if (player == null || !player.isOnline() || targetServer == null) return false;
         try {
@@ -56,9 +48,6 @@ public final class ProxyBridgeManager implements PluginMessageListener {
         }
     }
 
-    /**
-     * Gửi tin nhắn riêng tới một người chơi ở bất kỳ server nào trong cụm (Cross-Server PM).
-     */
     public boolean sendCrossServerMessage(Player sender, String targetPlayer, String message) {
         Player carrier = sender != null ? sender : getAnyOnlinePlayer();
         if (carrier == null) return false;
@@ -75,9 +64,6 @@ public final class ProxyBridgeManager implements PluginMessageListener {
         }
     }
 
-    /**
-     * Lấy số lượng người chơi của một server con hoặc toàn bộ network ("ALL").
-     */
     public void requestPlayerCount(Player sender, String serverName, Consumer<Integer> callback) {
         Player carrier = sender != null ? sender : getAnyOnlinePlayer();
         if (carrier == null) {
@@ -96,9 +82,6 @@ public final class ProxyBridgeManager implements PluginMessageListener {
         }
     }
 
-    /**
-     * Lấy danh sách tên tất cả các server con đang đăng ký trên Velocity / BungeeCord.
-     */
     public void requestServerList(Player sender, Consumer<List<String>> callback) {
         Player carrier = sender != null ? sender : getAnyOnlinePlayer();
         if (carrier == null) {
@@ -116,9 +99,6 @@ public final class ProxyBridgeManager implements PluginMessageListener {
         }
     }
 
-    /**
-     * Gửi payload dữ liệu tùy biến tới toàn bộ các server con khác trên proxy.
-     */
     public boolean broadcastToAllServers(Player sender, String subChannel, byte[] data) {
         Player carrier = sender != null ? sender : getAnyOnlinePlayer();
         if (carrier == null) return false;

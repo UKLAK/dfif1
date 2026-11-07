@@ -10,10 +10,6 @@ import org.bukkit.command.TabCompleter;
 
 import java.util.*;
 
-/**
- * Lệnh Chỉ Huy An Ninh & Phòng Thủ CVE Toàn Diện (/jsecurity hoặc /jprotect).
- * Hợp nhất toàn bộ các phân hệ bảo mật và CVE defenses vào 1 cổng điều khiển duy nhất.
- */
 public final class JSecurityCommand implements CommandExecutor, TabCompleter {
 
     private final JavaStudioPlugin plugin;

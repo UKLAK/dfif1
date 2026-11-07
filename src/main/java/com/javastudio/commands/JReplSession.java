@@ -15,11 +15,6 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Trình quản lý phiên lập trình tương tác trực tiếp qua Chat (In-Game Interactive REPL).
- * Cho phép lập trình viên gõ code từng dòng trong chat, duy trì biến trạng thái giữa các dòng
- * mà không cần gõ tiền tố /java liên tục.
- */
 public class JReplSession implements Listener {
 
     private final JavaStudioPlugin plugin;
@@ -28,6 +23,8 @@ public class JReplSession implements Listener {
     private static class ReplContext {
         final List<String> history = new ArrayList<>();
         final List<String> storedDeclarations = new ArrayList<>();
+        final StringBuilder multilineBuffer = new StringBuilder();
+        int braceDepth = 0;
         int lineCounter = 0;
     }
 
@@ -43,12 +40,15 @@ public class JReplSession implements Listener {
 
     public void startRepl(Player player) {
         activeSessions.put(player.getUniqueId(), new ReplContext());
-        MessageUtil.send(player, "&6=== CHẾ ĐỘ LẬP TRÌNH TƯƠNG TÁC (JAVA REPL) ===");
+        MessageUtil.send(player, "&6=== CHẾ ĐỘ LẬP TRÌNH TƯƠNG TÁC (JAVA REPL v2) ===");
         MessageUtil.sendRaw(player, "  &7Bạn đang ở trong REPL Mode. Mọi tin nhắn chat sẽ được biên dịch là mã Java!");
-        MessageUtil.sendRaw(player, "  &e• Gõ &fexit &ehoặc &fquit &7để thoát chế độ");
-        MessageUtil.sendRaw(player, "  &e• Gõ &fvars &7để xem các biến đang lưu");
-        MessageUtil.sendRaw(player, "  &e• Gõ &fclear &7để xóa bộ nhớ đệm biến");
-        MessageUtil.sendRaw(player, "  &aVí dụ: &fint x = 64; &7sau đó dòng tiếp theo: &fgive(\"diamond\", x);");
+        MessageUtil.sendRaw(player, "  &e• &fexit &e/ &fquit &7- Thoát chế độ REPL");
+        MessageUtil.sendRaw(player, "  &e• &fvars &7- Xem danh sách các biến trạng thái đang lưu");
+        MessageUtil.sendRaw(player, "  &e• &fhistory &7- Xem lại lịch sử các câu lệnh đã chạy");
+        MessageUtil.sendRaw(player, "  &e• &fundo &7- Hủy khai báo biến gần nhất");
+        MessageUtil.sendRaw(player, "  &e• &fclear &7- Xóa trắng bộ nhớ biến");
+        MessageUtil.sendRaw(player, "  &a• Hỗ trợ khối đa dòng: mở ngoặc &f{ &avà đóng &f} &akhi kết thúc khối!");
+        MessageUtil.sendRaw(player, "  &bVí dụ: &fint x = 64; &7sau đó dòng tiếp theo: &fgive(\"diamond\", x);");
     }
 
     public void stopRepl(Player player) {
@@ -75,7 +75,9 @@ public class JReplSession implements Listener {
         if (line.equalsIgnoreCase("clear")) {
             ctx.history.clear();
             ctx.storedDeclarations.clear();
-            MessageUtil.sendInfo(player, "Đã xóa toàn bộ bộ đệm biến của phiên REPL.");
+            ctx.multilineBuffer.setLength(0);
+            ctx.braceDepth = 0;
+            MessageUtil.sendInfo(player, "Đã xóa toàn bộ bộ đệm biến và trạng thái REPL.");
             return;
         }
 
@@ -91,8 +93,56 @@ public class JReplSession implements Listener {
             return;
         }
 
-        // Chạy trên main thread để đảm bảo tương thích an toàn với Bukkit
-        plugin.getServer().getScheduler().runTask(plugin, () -> executeReplLine(player, ctx, line));
+        if (line.equalsIgnoreCase("history")) {
+            if (ctx.history.isEmpty()) {
+                MessageUtil.sendInfo(player, "Lịch sử REPL đang trống.");
+            } else {
+                MessageUtil.send(player, "&6=== Lịch Sử REPL (" + ctx.history.size() + ") ===");
+                for (int i = 0; i < ctx.history.size(); i++) {
+                    MessageUtil.sendRaw(player, "  &7[" + (i + 1) + "] &f" + ctx.history.get(i));
+                }
+            }
+            return;
+        }
+
+        if (line.equalsIgnoreCase("undo")) {
+            if (!ctx.storedDeclarations.isEmpty()) {
+                String removed = ctx.storedDeclarations.remove(ctx.storedDeclarations.size() - 1);
+                MessageUtil.sendSuccess(player, "Đã hủy biến: &e" + removed);
+            } else {
+                MessageUtil.sendInfo(player, "Không có biến nào để hoàn tác.");
+            }
+            return;
+        }
+
+        int opens = countChars(line, '{');
+        int closes = countChars(line, '}');
+        ctx.braceDepth += (opens - closes);
+
+        if (ctx.braceDepth > 0) {
+            ctx.multilineBuffer.append(" ").append(line);
+            MessageUtil.sendRaw(player, "&8[REPL " + ctx.braceDepth + "] &e... | &f" + line);
+            return;
+        } else if (ctx.multilineBuffer.length() > 0) {
+            ctx.multilineBuffer.append(" ").append(line);
+            String fullBlock = ctx.multilineBuffer.toString().trim();
+            ctx.multilineBuffer.setLength(0);
+            ctx.braceDepth = 0;
+            line = fullBlock;
+        }
+
+        final String codeToExecute = line;
+        ctx.history.add(codeToExecute);
+
+        plugin.getServer().getScheduler().runTask(plugin, () -> executeReplLine(player, ctx, codeToExecute));
+    }
+
+    private int countChars(String s, char c) {
+        int count = 0;
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) == c) count++;
+        }
+        return count;
     }
 
     @EventHandler
@@ -105,8 +155,7 @@ public class JReplSession implements Listener {
         String className = "Repl_" + player.getName() + "_" + ctx.lineCounter;
         String fullClassPath = "com.javastudio.runtime." + className;
 
-        // Kiểm tra xem dòng có phải là khai báo biến hay không (ví dụ int x = 10;)
-        boolean isDeclaration = line.matches("^(int|double|float|long|short|byte|boolean|char|String|var|ItemStack|Player|Location|Entity)\\s+[a-zA-Z0-9_]+\\s*=.*");
+        boolean isDeclaration = line.matches("^(int|double|float|long|short|byte|boolean|char|String|var|ItemStack|Player|Location|Entity|World)\\s+[a-zA-Z0-9_]+\\s*=.*");
 
         StringBuilder declarationsBlock = new StringBuilder();
         for (String dec : ctx.storedDeclarations) {
@@ -116,7 +165,7 @@ public class JReplSession implements Listener {
         String executionLine = line;
         if (!executionLine.contains(";") && !executionLine.contains("{") && !isDeclaration) {
             executionLine = "return String.valueOf(" + executionLine + ");";
-        } else if (!executionLine.endsWith(";")) {
+        } else if (!executionLine.endsWith(";") && !executionLine.endsWith("}")) {
             executionLine += ";";
         }
 
@@ -165,7 +214,7 @@ public class JReplSession implements Listener {
                 MessageUtil.sendRaw(player, "&a✔ &7(Thực thi thành công)");
             }
         } catch (Throwable t) {
-            MessageUtil.sendRaw(player, "&c✖ Runtime Exception: &f" + t.getMessage());
+            MessageUtil.sendRaw(player, "&c✖ Lỗi thực thi: &f" + t.getMessage());
         }
     }
 }

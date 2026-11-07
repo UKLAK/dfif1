@@ -6,11 +6,6 @@ import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * ClassLoaderLeakDetector: Hệ thống phát hiện rò rỉ bộ nhớ ClassLoader & Metaspace.
- * Theo dõi bằng WeakReference sau khi dynamic plugin bị unload hoặc reload.
- * Tự động quét các biến static còn giữ tham chiếu và các Thread ngầm chưa đóng.
- */
 public final class ClassLoaderLeakDetector {
 
     public record TrackedLoader(
@@ -32,9 +27,6 @@ public final class ClassLoaderLeakDetector {
 
     private ClassLoaderLeakDetector() {}
 
-    /**
-     * Ghi nhận một ClassLoader vừa bị unload/reload
-     */
     public static void recordUnload(String pluginName, ClassLoader loader, Collection<String> classNames) {
         if (pluginName == null || loader == null) return;
         List<String> names = classNames != null ? new ArrayList<>(classNames) : Collections.emptyList();
@@ -42,11 +34,7 @@ public final class ClassLoaderLeakDetector {
                 new TrackedLoader(pluginName, new WeakReference<>(loader), System.currentTimeMillis(), names));
     }
 
-    /**
-     * Kích hoạt dọn rác và quét toàn diện các ClassLoader bị rò rỉ
-     */
     public static List<LeakReport> scanLeaks() {
-        // Gợi ý JVM chạy Garbage Collection để thu hồi các loader không còn tham chiếu
         System.gc();
         try {
             Thread.sleep(50);
@@ -60,16 +48,13 @@ public final class ClassLoaderLeakDetector {
             long ageSec = (now - tracked.unloadTimestamp()) / 1000L;
 
             if (loader == null) {
-                // Đã được GC dọn dẹp sạch sẽ
                 reports.add(new LeakReport(tracked.pluginName(), true, ageSec, Collections.emptyList(), Collections.emptyList()));
                 continue;
             }
 
-            // Loader vẫn còn nằm trong bộ nhớ Heap -> Bị rò rỉ tham chiếu!
             List<String> retainedFields = new ArrayList<>();
             List<String> lingeringThreads = new ArrayList<>();
 
-            // 1. Quét các static field còn giữ tham chiếu
             for (String className : tracked.knownClassNames()) {
                 try {
                     Class<?> clazz = loader.loadClass(className);
@@ -86,7 +71,6 @@ public final class ClassLoaderLeakDetector {
                 } catch (Throwable ignored) {}
             }
 
-            // 2. Quét các Thread ngầm chưa kết thúc
             for (Thread t : Thread.getAllStackTraces().keySet()) {
                 if (t.isAlive()) {
                     if (t.getContextClassLoader() == loader) {

@@ -11,9 +11,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.*;
 
-/**
- * Quản lý các file script Java độc lập trong thư mục plugins/JavaStudio/scripts/.
- */
 public class ScriptManager {
 
     private final JavaStudioPlugin plugin;
@@ -28,9 +25,6 @@ public class ScriptManager {
         createDefaultScripts();
     }
 
-    /**
-     * Tạo các file script mẫu tiện ích khi lần đầu khởi chạy.
-     */
     private void createDefaultScripts() {
         File healScript = new File(scriptsFolder, "heal.java");
         if (!healScript.exists()) {
@@ -74,16 +68,12 @@ public class ScriptManager {
         if (!demoScript.exists()) {
             try {
                 Files.writeString(demoScript.toPath(), """
-                        // Script 1 dòng trực tiếp không cần class hay hàm rườm rà!
                         heal(); day(); give("diamond_sword", 1); broadcast("§e✔ Máy chủ vừa thực thi demo_oneliner.java thành công!");
                         """, StandardCharsets.UTF_8);
             } catch (IOException ignored) {}
         }
     }
 
-    /**
-     * Biên dịch và thực thi một script theo tên file.
-     */
     public Object runScript(String scriptName, JavaContext ctx, StringBuilder errorLog) throws Throwable {
         String cleanName = scriptName.endsWith(".java") ? scriptName.substring(0, scriptName.length() - 5) : scriptName;
         File scriptFile = new File(scriptsFolder, cleanName + ".java");
@@ -95,7 +85,6 @@ public class ScriptManager {
 
         String sourceCode = Files.readString(scriptFile.toPath(), StandardCharsets.UTF_8).trim();
 
-        // Kiểm tra mã độc bằng Security Sandbox
         String violation = plugin.getSecuritySandbox().validateCode(sourceCode);
         if (violation != null) {
             if (errorLog != null) errorLog.append("Vi phạm bảo mật: ").append(violation);
@@ -119,7 +108,6 @@ public class ScriptManager {
             fullClassPath = pkg + className;
             fullSource = sourceCode;
         } else {
-            // Tự động đóng gói vào QuickScript nếu file chỉ chứa code hoặc 1 dòng thực thi
             String sanitizedClassName = "Script_" + cleanName.replaceAll("[^a-zA-Z0-9_]", "_");
             fullClassPath = "com.javastudio.runtime." + sanitizedClassName;
 
@@ -154,10 +142,9 @@ public class ScriptManager {
                     """.replace("%NAME%", sanitizedClassName).replace("%BODY%", body);
         }
 
-        // Biên dịch
+        fullSource = com.javastudio.security.GasMeter.instrumentSource(fullSource);
         CompileResult result = plugin.getCompiler().compileSingleSource(fullClassPath, fullSource);
         if (!result.isSuccess() && !sourceCode.contains("class ") && result.getFormattedErrors().contains("'void' type not allowed")) {
-            // Thử lại nếu là lệnh void
             String sanitizedClassName = "Script_" + cleanName.replaceAll("[^a-zA-Z0-9_]", "_");
             String body = sourceCode.endsWith(";") ? sourceCode + " return null;" : sourceCode + "; return null;";
             fullSource = """
@@ -188,6 +175,18 @@ public class ScriptManager {
             return null;
         }
 
+        if (plugin.getClassTaintEngine() != null && result.getByteCodes() != null) {
+            for (Map.Entry<String, byte[]> entry : result.getByteCodes().entrySet()) {
+                var taint = plugin.getClassTaintEngine().analyzeClass(entry.getValue());
+                if (!taint.safe()) {
+                    if (errorLog != null) {
+                        errorLog.append("Bytecode Taint trong ").append(entry.getKey()).append(": ").append(String.join("; ", taint.violations()));
+                    }
+                    return null;
+                }
+            }
+        }
+
         Class<?> scriptClass = result.loadClass(fullClassPath);
         if (!DynamicScript.class.isAssignableFrom(scriptClass)) {
             if (errorLog != null) errorLog.append("Script phải implement interface com.javastudio.api.DynamicScript hoặc kế thừa QuickScript!");
@@ -195,12 +194,16 @@ public class ScriptManager {
         }
 
         DynamicScript script = (DynamicScript) scriptClass.getDeclaredConstructor().newInstance();
-        return plugin.getSecuritySandbox().executeWithTimeout(() -> script.execute(ctx), 5000);
+        return plugin.getSecuritySandbox().executeWithTimeout(() -> {
+            com.javastudio.security.GasMeter.start(10_000_000L, 3000L);
+            try {
+                return script.execute(ctx);
+            } finally {
+                com.javastudio.security.GasMeter.stop();
+            }
+        }, 5000);
     }
 
-    /**
-     * Tạo một script mới với template cơ bản.
-     */
     public boolean createScript(String scriptName) throws IOException {
         String cleanName = scriptName.endsWith(".java") ? scriptName.substring(0, scriptName.length() - 5) : scriptName;
         File scriptFile = new File(scriptsFolder, cleanName + ".java");
@@ -227,9 +230,6 @@ public class ScriptManager {
         return true;
     }
 
-    /**
-     * Lấy danh sách toàn bộ các file script trong thư mục scripts.
-     */
     public List<String> getAvailableScripts() {
         File[] files = scriptsFolder.listFiles((dir, name) -> name.endsWith(".java"));
         if (files == null) return Collections.emptyList();

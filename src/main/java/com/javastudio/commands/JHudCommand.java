@@ -12,9 +12,6 @@ import org.bukkit.entity.Player;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Lệnh bật/tắt thanh Debug HUD thời gian thực (/jhud).
- */
 public final class JHudCommand implements CommandExecutor, TabCompleter {
 
     private final JavaStudioPlugin plugin;

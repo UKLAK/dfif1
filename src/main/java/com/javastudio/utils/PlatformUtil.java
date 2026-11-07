@@ -10,11 +10,6 @@ import java.lang.reflect.Method;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-/**
- * Tiện ích phát hiện môi trường server (Paper, Purpur, Spigot, Folia từ 1.20.5 đến 26.3+)
- * và cung cấp bộ điều phối Task (Scheduler) tương thích đa nền tảng, loại bỏ hoàn toàn
- * lỗi UnsupportedOperationException trên Folia và đảm bảo an toàn luồng.
- */
 public class PlatformUtil {
 
     private static final boolean IS_FOLIA;
@@ -73,7 +68,6 @@ public class PlatformUtil {
             PLATFORM_NAME = "Spigot";
         }
 
-        // Nhận diện phiên bản Java máy ảo (Java 21, 22, 23, 24, 25+)
         int jv = 21;
         try {
             jv = Runtime.version().feature();
@@ -88,7 +82,6 @@ public class PlatformUtil {
         JAVA_FEATURE_VERSION = jv;
         JAVA_VERSION_STRING = System.getProperty("java.version", "21");
 
-        // Khởi tạo Virtual Threads (Project Loom) chuẩn Java 21+
         boolean vt = false;
         java.util.concurrent.ExecutorService vExec = null;
         try {
@@ -139,10 +132,6 @@ public class PlatformUtil {
         return VIRTUAL_EXECUTOR;
     }
 
-    /**
-     * Chạy tác vụ I/O nặng bất đồng bộ trên Virtual Thread (Project Loom) của Java 21+.
-     * Giảm thiểu 100% chi phí OS Thread, cho phép chạy hàng ngàn tác vụ ngầm đồng thời.
-     */
     public static void runVirtualTask(Runnable runnable) {
         if (runnable == null) return;
         if (VIRTUAL_THREADS_SUPPORTED && VIRTUAL_EXECUTOR != null && !VIRTUAL_EXECUTOR.isShutdown()) {
@@ -170,17 +159,11 @@ public class PlatformUtil {
         }
     }
 
-    /**
-     * Interface đại diện cho một tác vụ có thể hủy, hoạt động đồng nhất trên cả Folia và Bukkit.
-     */
     public interface TaskHandle {
         void cancel();
         boolean isCancelled();
     }
 
-    /**
-     * Chạy 1 task đồng bộ (Main thread trên Spigot/Paper, GlobalRegionScheduler trên Folia).
-     */
     public static TaskHandle runTask(Plugin plugin, Runnable runnable) {
         if (IS_FOLIA) {
             return scheduleFoliaGlobal(plugin, (task) -> runnable.run(), 0);
@@ -189,9 +172,6 @@ public class PlatformUtil {
         return wrapBukkitTask(bt);
     }
 
-    /**
-     * Chạy 1 task bất đồng bộ (Async).
-     */
     public static TaskHandle runTaskAsync(Plugin plugin, Runnable runnable) {
         if (IS_FOLIA) {
             return scheduleFoliaAsync(plugin, (task) -> runnable.run(), 0);
@@ -200,9 +180,6 @@ public class PlatformUtil {
         return wrapBukkitTask(bt);
     }
 
-    /**
-     * Chạy 1 task sau N ticks.
-     */
     public static TaskHandle runTaskLater(Plugin plugin, Runnable runnable, long delayTicks) {
         if (IS_FOLIA) {
             return scheduleFoliaGlobal(plugin, (task) -> runnable.run(), Math.max(1, delayTicks));
@@ -211,9 +188,6 @@ public class PlatformUtil {
         return wrapBukkitTask(bt);
     }
 
-    /**
-     * Chạy 1 task lặp lại định kỳ.
-     */
     public static TaskHandle runTaskTimer(Plugin plugin, Runnable runnable, long delayTicks, long periodTicks) {
         if (IS_FOLIA) {
             return scheduleFoliaGlobalRepeating(plugin, (task) -> runnable.run(), Math.max(1, delayTicks), Math.max(1, periodTicks));
@@ -222,9 +196,6 @@ public class PlatformUtil {
         return wrapBukkitTask(bt);
     }
 
-    /**
-     * Chạy 1 task tại tọa độ Location chỉ định (Đảm bảo an toàn Thread Region trên Folia).
-     */
     public static TaskHandle runAtLocation(Plugin plugin, Location location, Runnable runnable) {
         if (IS_FOLIA && location != null && location.getWorld() != null) {
             return scheduleFoliaRegion(plugin, location, (task) -> runnable.run(), 0);
@@ -232,9 +203,6 @@ public class PlatformUtil {
         return runTask(plugin, runnable);
     }
 
-    /**
-     * Chạy 1 task tại tọa độ Location sau N ticks (Folia Region Scheduler).
-     */
     public static TaskHandle runAtLocationLater(Plugin plugin, Location location, Runnable runnable, long delayTicks) {
         if (IS_FOLIA && location != null && location.getWorld() != null) {
             return scheduleFoliaRegion(plugin, location, (task) -> runnable.run(), Math.max(1, delayTicks));
@@ -242,9 +210,6 @@ public class PlatformUtil {
         return runTaskLater(plugin, runnable, delayTicks);
     }
 
-    /**
-     * Chạy 1 task gắn liền với Entity chỉ định (Folia Entity Scheduler).
-     */
     public static TaskHandle runAtEntity(Plugin plugin, Entity entity, Runnable runnable) {
         if (IS_FOLIA && entity != null && entity.isValid()) {
             return scheduleFoliaEntity(plugin, entity, (task) -> runnable.run(), 0);
@@ -252,9 +217,6 @@ public class PlatformUtil {
         return runTask(plugin, runnable);
     }
 
-    /**
-     * Chạy 1 task gắn liền với Entity sau N ticks (Folia Entity Scheduler).
-     */
     public static TaskHandle runAtEntityLater(Plugin plugin, Entity entity, Runnable runnable, long delayTicks) {
         if (IS_FOLIA && entity != null && entity.isValid()) {
             return scheduleFoliaEntity(plugin, entity, (task) -> runnable.run(), Math.max(1, delayTicks));
@@ -262,9 +224,6 @@ public class PlatformUtil {
         return runTaskLater(plugin, runnable, delayTicks);
     }
 
-    /**
-     * Dịch chuyển entity an toàn đa nền tảng (Folia/Paper teleportAsync hoặc Spigot fallback).
-     */
     public static java.util.concurrent.CompletableFuture<Boolean> teleportAsync(Entity entity, Location location) {
         if (entity == null || location == null) {
             return java.util.concurrent.CompletableFuture.completedFuture(false);
@@ -318,7 +277,6 @@ public class PlatformUtil {
                 return wrapFoliaTask(task);
             }
         } catch (Throwable t) {
-            // Fallback nếu có lỗi bất ngờ
             BukkitTask bt = Bukkit.getScheduler().runTask(plugin, () -> consumer.accept(null));
             return wrapBukkitTask(bt);
         }

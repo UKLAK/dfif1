@@ -15,10 +15,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Lệnh tố cáo người chơi nghi vấn hack (/report <player> <lý do>).
- * Tích hợp tự động kích hoạt điều tra của JAntiCheat.
- */
 public final class JReportCommand implements CommandExecutor, TabCompleter {
 
     private final JavaStudioPlugin plugin;
@@ -37,6 +33,11 @@ public final class JReportCommand implements CommandExecutor, TabCompleter {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player player)) {
             MessageUtil.sendError(sender, "Chỉ người chơi trong game mới có thể gửi tố cáo!");
+            return true;
+        }
+
+        if (!plugin.getSettingsManager().isAntiCheatEnabled() || !manager.isActive() || manager.getReportManager() == null) {
+            MessageUtil.sendError(player, "Hệ thống tố cáo hack (/report) đang tạm tắt!");
             return true;
         }
 
@@ -62,6 +63,9 @@ public final class JReportCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (!plugin.getSettingsManager().isAntiCheatEnabled() || !manager.isActive()) {
+            return Collections.emptyList();
+        }
         if (args.length == 1) {
             String prefix = args[0].toLowerCase();
             return Bukkit.getOnlinePlayers().stream()

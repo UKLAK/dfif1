@@ -12,9 +12,6 @@ import org.bukkit.command.TabCompleter;
 import java.io.IOException;
 import java.util.*;
 
-/**
- * Lệnh /jscript để quản lý và thực thi các file Java script độc lập.
- */
 public class JScriptCommand implements CommandExecutor, TabCompleter {
 
     private final JavaStudioPlugin plugin;

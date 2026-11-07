@@ -6,11 +6,6 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 
 import java.lang.reflect.Method;
 
-/**
- * Cầu nối tích hợp tự động với Vault Economy & Permissions (Vault Bridge).
- * Cung cấp các hàm nạp/rút tiền, kiểm tra số dư và phân quyền an toàn,
- * tự động kiểm tra và không gây lỗi nếu server không cài đặt Vault.
- */
 public class VaultBridge {
 
     private static Object economyProvider = null;

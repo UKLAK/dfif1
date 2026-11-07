@@ -21,10 +21,6 @@ import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * TotpManager: Hệ thống xác thực 2 lớp (2FA / Google Authenticator) chuẩn RFC 6238.
- * Cho phép hiển thị khóa thiết lập lên bản đồ Map in-game và tự động thu hồi phiên (GHSA-MGR9-6C2J-JXRQ).
- */
 @SuppressWarnings("deprecation")
 public class TotpManager {
 
@@ -32,7 +28,6 @@ public class TotpManager {
     private final File storageFile;
     private final YamlConfiguration storage;
 
-    // Lưu phiên đã đăng nhập thành công trong chu kỳ online: Set<UUID>
     private final Set<UUID> authenticatedSessions = ConcurrentHashMap.newKeySet();
     private static final String BASE32_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
@@ -47,7 +42,7 @@ public class TotpManager {
     }
 
     public boolean isAuthenticated(UUID uuid) {
-        if (!isTotpEnabled(uuid)) return true; // Nếu chưa cài 2FA thì cho phép
+        if (!isTotpEnabled(uuid)) return true;
         return authenticatedSessions.contains(uuid);
     }
 
@@ -65,7 +60,7 @@ public class TotpManager {
 
     public String generateSecret() {
         SecureRandom random = new SecureRandom();
-        byte[] buffer = new byte[10]; // 80 bits
+        byte[] buffer = new byte[10];
         random.nextBytes(buffer);
         StringBuilder sb = new StringBuilder();
         for (byte b : buffer) {
@@ -96,15 +91,11 @@ public class TotpManager {
         }
     }
 
-    /**
-     * Xác thực mã 6 số nhập từ Google Authenticator hoặc Authy.
-     */
     public boolean verifyCode(UUID uuid, int inputCode) {
         String secret = storage.getString("users." + uuid + ".secret");
         if (secret == null) return false;
 
         long currentWindow = System.currentTimeMillis() / 1000L / 30L;
-        // Kiểm tra window -1, 0, +1 để bù trừ lệch giờ client/server
         for (int i = -1; i <= 1; i++) {
             if (generateTotpCode(secret, currentWindow + i) == inputCode) {
                 authenticatedSessions.add(uuid);
@@ -114,9 +105,6 @@ public class TotpManager {
         return false;
     }
 
-    /**
-     * Trao cho người chơi bản đồ in-game chứa hình ảnh hướng dẫn và mã cài đặt 2FA.
-     */
     public void giveQrSetupMap(Player player, String secret) {
         MapView view = Bukkit.createMap(player.getWorld());
         view.getRenderers().clear();
@@ -128,22 +116,19 @@ public class TotpManager {
                 if (rendered) return;
                 rendered = true;
 
-                // Nền đen
                 for (int x = 0; x < 128; x++) {
                     for (int y = 0; y < 128; y++) {
-                        canvas.setPixel(x, y, (byte) 119); // Dark color
+                        canvas.setPixel(x, y, (byte) 119);
                     }
                 }
 
-                // Vẽ khung viền
                 for (int i = 8; i < 120; i++) {
-                    canvas.setPixel(i, 8, (byte) 34); // Vàng
+                    canvas.setPixel(i, 8, (byte) 34);
                     canvas.setPixel(i, 119, (byte) 34);
                     canvas.setPixel(8, i, (byte) 34);
                     canvas.setPixel(119, i, (byte) 34);
                 }
 
-                // Vẽ ma trận đồ họa 2FA giả lập ở trung tâm
                 for (int x = 24; x < 104; x += 4) {
                     for (int y = 24; y < 80; y += 4) {
                         boolean dot = ((x * 7 + y * 13 + secret.hashCode()) % 3 == 0);
@@ -156,7 +141,6 @@ public class TotpManager {
                     }
                 }
 
-                // Ghi chữ tiêu đề
                 canvas.drawText(16, 90, org.bukkit.map.MinecraftFont.Font, "§0KEY 2FA CỦA BẠN:");
                 canvas.drawText(16, 102, org.bukkit.map.MinecraftFont.Font, "§4" + secret);
             }

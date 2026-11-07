@@ -10,10 +10,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
-/**
- * Trình quản lý lưu trữ dữ liệu (DataStore) tích hợp sẵn cho Dynamic Plugins.
- * Hỗ trợ SQLite Database và tự động Fallback sang File-based JSON nếu môi trường không có SQLite Driver.
- */
 public class DataStore implements Closeable {
 
     private final File dataFolder;
@@ -42,7 +38,6 @@ public class DataStore implements Closeable {
 
     private void initStorage() {
         try {
-            // Thử khởi tạo SQLite JDBC
             Class.forName("org.sqlite.JDBC");
             connection = DriverManager.getConnection("jdbc:sqlite:" + dbFile.getAbsolutePath());
             try (Statement st = connection.createStatement()) {
@@ -58,9 +53,6 @@ public class DataStore implements Closeable {
         }
     }
 
-    /**
-     * Lưu giá trị theo khóa (Key-Value)
-     */
     public synchronized void set(String key, Object value) {
         if (key == null) return;
         String strVal = String.valueOf(value);
@@ -81,9 +73,6 @@ public class DataStore implements Closeable {
         saveFallback();
     }
 
-    /**
-     * Lấy giá trị dạng chuỗi
-     */
     public synchronized String get(String key) {
         if (key == null) return null;
         if (cacheMap.containsKey(key)) {
@@ -170,9 +159,6 @@ public class DataStore implements Closeable {
         return new ArrayList<>(cacheMap.keySet());
     }
 
-    /**
-     * Lấy trực tiếp kết nối SQL nếu plugin muốn thực thi câu lệnh SQL nâng cao
-     */
     public Connection getConnection() {
         return connection;
     }

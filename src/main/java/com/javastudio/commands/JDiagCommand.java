@@ -12,10 +12,6 @@ import org.bukkit.entity.Player;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Lệnh Chẩn Đoán & Giám Sát Hiệu Năng Hợp Nhất (/jdiag hoặc /jperf).
- * Hợp nhất thông số phần cứng, JVM, Dynamic Plugin Profiler và dọn rác khẩn cấp.
- */
 public final class JDiagCommand implements CommandExecutor, TabCompleter {
 
     private final JavaStudioPlugin plugin;

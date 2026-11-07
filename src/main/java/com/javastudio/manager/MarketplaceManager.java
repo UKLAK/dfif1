@@ -9,10 +9,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.*;
 
-/**
- * Quản lý kho chợ Plugin & Script (Marketplace & Package Manager).
- * Cung cấp sẵn các dynamic plugins thực chiến và cho phép cài đặt với 1 lệnh / 1 click.
- */
 public final class MarketplaceManager {
 
     private final JavaStudioPlugin plugin;
@@ -35,7 +31,6 @@ public final class MarketplaceManager {
     }
 
     private void registerBuiltinPackages() {
-        // 1. TreeFeller
         register(new MarketPackage(
                 "tree-feller",
                 "TreeFeller",
@@ -99,7 +94,6 @@ public final class MarketplaceManager {
                 """
         ));
 
-        // 2. CustomEnchants (Sấm Sét & Hút Máu)
         register(new MarketPackage(
                 "custom-enchants",
                 "CustomEnchants",
@@ -152,7 +146,6 @@ public final class MarketplaceManager {
                 """
         ));
 
-        // 3. AntiLagPurge
         register(new MarketPackage(
                 "anti-lag-purge",
                 "AntiLagPurge",
@@ -189,13 +182,12 @@ public final class MarketplaceManager {
                                     Bukkit.broadcastMessage("§c[AntiLag] §eĐã dọn dẹp " + cleared + " items rơi để khôi phục TPS server!");
                                 }
                             }
-                        }, 200L, 600L); // Kiểm tra mỗi 30 giây
+                        }, 200L, 600L);
                     }
                 }
                 """
         ));
 
-        // 4. AutoBroadcast
         register(new MarketPackage(
                 "auto-broadcast",
                 "AutoBroadcast",
@@ -229,7 +221,7 @@ public final class MarketplaceManager {
                                 p.sendMessage(msg);
                                 p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 1f, 1f);
                             }
-                        }, 100L, 2400L); // Mỗi 2 phút
+                        }, 100L, 2400L);
                     }
                 }
                 """
@@ -249,9 +241,6 @@ public final class MarketplaceManager {
         return registry.get(id.toLowerCase());
     }
 
-    /**
-     * Cài đặt một package từ Marketplace vào thư mục projects/ và tự động biên dịch, nạp.
-     */
     public boolean installPackage(String packageId, StringBuilder log) {
         MarketPackage pkg = getPackage(packageId);
         if (pkg == null) {
@@ -269,7 +258,6 @@ public final class MarketplaceManager {
         try {
             Files.writeString(mainJava.toPath(), pkg.sourceCode(), StandardCharsets.UTF_8);
 
-            // Tạo file metadata.yml để DynamicPluginManager nhận diện và nạp đúng
             File metaFile = new File(projectDir, "metadata.yml");
             YamlConfiguration meta = new YamlConfiguration();
             meta.set("name", projectName);
@@ -279,7 +267,6 @@ public final class MarketplaceManager {
             meta.set("description", pkg.description());
             meta.save(metaFile);
 
-            // Tạo data/config.yml mẫu
             File dataDir = new File(projectDir, "data");
             dataDir.mkdirs();
             File configFile = new File(dataDir, "config.yml");
@@ -293,7 +280,6 @@ public final class MarketplaceManager {
             return false;
         }
 
-        // Tự động nạp plugin
         boolean success = plugin.getPluginManager().loadPlugin(projectName, log);
         if (success && log != null) {
             log.append("Đã cài đặt và kích hoạt thành công package: ").append(projectName);

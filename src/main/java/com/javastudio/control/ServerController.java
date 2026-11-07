@@ -12,13 +12,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.*;
 
-/**
- * Trình điều khiển Toàn bộ Máy chủ (Server & Software Controller) cho phép:
- * - Giám sát hiệu năng phần cứng: TPS (1m, 5m, 15m), MSPT (thời gian xử lý tick), RAM, CPU, Luồng JVM
- * - Dọn dẹp tài nguyên: Kích hoạt Garbage Collector (GC), dọn sạch Entities / Drop Items gây lag
- * - Quản lý Thế giới (Worlds): Lưu thế giới, kiểm tra Chunks nạp, đếm số lượng thực thể
- * - Điều khiển hệ thống: Thực thi lệnh console, bật/tắt chế độ bảo trì (Whitelist)
- */
 public class ServerController {
 
     private final JavaStudioPlugin hostPlugin;
@@ -33,16 +26,12 @@ public class ServerController {
         return hostPlugin;
     }
 
-    /**
-     * Lấy mảng TPS của máy chủ [1m, 5m, 15m]. Tương thích Paper, Purpur, Spigot và Folia.
-     */
     public double[] getTPS() {
         try {
             Method getTpsMethod = Bukkit.class.getMethod("getTPS");
             return (double[]) getTpsMethod.invoke(null);
         } catch (Throwable ignored) {}
 
-        // Fallback qua CraftServer / MinecraftServer
         try {
             Object server = Bukkit.getServer();
             Field serverField = server.getClass().getDeclaredField("console");
@@ -55,9 +44,6 @@ public class ServerController {
         return new double[]{20.0, 20.0, 20.0};
     }
 
-    /**
-     * Lấy thời gian xử lý trung bình mỗi tick (MSPT - Milliseconds Per Tick).
-     */
     public double getMSPT() {
         try {
             Method getAvgTickTimeMethod = Bukkit.class.getMethod("getAverageTickTime");
@@ -66,9 +52,6 @@ public class ServerController {
         return 0.0;
     }
 
-    /**
-     * Lấy thông tin chi tiết về bộ nhớ RAM (MB).
-     */
     public MemoryInfo getMemoryInfo() {
         Runtime rt = Runtime.getRuntime();
         long maxMb = rt.maxMemory() / (1024 * 1024);
@@ -79,9 +62,6 @@ public class ServerController {
         return new MemoryInfo(maxMb, totalMb, freeMb, usedMb, usedPercent);
     }
 
-    /**
-     * Lấy thông tin hệ thống (Hệ điều hành, CPU, Java, Cores).
-     */
     public Map<String, Object> getSystemInfo() {
         Map<String, Object> info = new LinkedHashMap<>();
         info.put("os", System.getProperty("os.name") + " " + System.getProperty("os.arch"));
@@ -108,9 +88,6 @@ public class ServerController {
         return info;
     }
 
-    /**
-     * Lấy thông tin thống kê của toàn bộ Worlds.
-     */
     public List<WorldInfo> getWorldsInfo() {
         List<WorldInfo> list = new ArrayList<>();
         for (World w : Bukkit.getWorlds()) {
@@ -125,9 +102,6 @@ public class ServerController {
         return list;
     }
 
-    /**
-     * Kích hoạt ép thu gom rác bộ nhớ (Garbage Collector) và trả về số MB đã giải phóng.
-     */
     public long triggerGC() {
         Runtime rt = Runtime.getRuntime();
         long beforeMb = (rt.totalMemory() - rt.freeMemory()) / (1024 * 1024);
@@ -136,15 +110,6 @@ public class ServerController {
         return Math.max(0, beforeMb - afterMb);
     }
 
-    /**
-     * Dọn dẹp thực thể gây lag trên thế giới chỉ định hoặc toàn bộ thế giới.
-     *
-     * @param targetWorld null nếu muốn dọn tất cả thế giới
-     * @param groundItems Có xóa item rơi vãi dưới đất không
-     * @param monsters    Có xóa quái vật không
-     * @param strayMobs   Có xóa động vật hoang dã (không thuần hóa, không đặt tên) không
-     * @return Số lượng entities đã xóa
-     */
     public int purgeEntities(World targetWorld) {
         return purgeEntities(targetWorld, true, true, false);
     }
@@ -183,9 +148,6 @@ public class ServerController {
         return false;
     }
 
-    /**
-     * Ép buộc toàn bộ thế giới lưu dữ liệu xuống đĩa cứng ngay lập tức.
-     */
     public void saveAllWorlds() {
         for (World w : Bukkit.getWorlds()) {
             w.save();
@@ -193,18 +155,12 @@ public class ServerController {
         Bukkit.savePlayers();
     }
 
-    /**
-     * Thực thi lệnh trực tiếp từ Console của server.
-     */
     public boolean executeConsoleCommand(String commandLine) {
         if (commandLine == null || commandLine.trim().isEmpty()) return false;
         String cmd = commandLine.startsWith("/") ? commandLine.substring(1) : commandLine;
         return Bukkit.dispatchCommand(Bukkit.getConsoleSender(), cmd);
     }
 
-    /**
-     * Bật hoặc tắt chế độ bảo trì (Whitelist).
-     */
     public void setMaintenanceMode(boolean enabled) {
         Bukkit.setWhitelist(enabled);
         if (enabled) {

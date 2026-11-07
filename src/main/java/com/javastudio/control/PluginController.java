@@ -20,13 +20,6 @@ import java.net.URLClassLoader;
 import java.util.*;
 import java.util.logging.Logger;
 
-/**
- * Trình điều khiển Plugin toàn diện (tương tự PlugManX) cho phép:
- * - Xem danh sách, thông tin chi tiết, phụ thuộc của mọi plugin server
- * - Bật (Enable), Tắt (Disable), Nạp mới (Load) file .jar bất kỳ
- * - Gỡ bỏ hoàn toàn (Unload) và giải phóng khóa file đĩa trên Windows
- * - Nạp lại (Reload) mọi plugin ngoài lúc server đang chạy mà không cần restart
- */
 public class PluginController {
 
     private final JavaStudioPlugin hostPlugin;
@@ -37,16 +30,10 @@ public class PluginController {
         this.logger = hostPlugin.getLogger();
     }
 
-    /**
-     * Lấy danh sách toàn bộ plugin đã đăng ký trên server.
-     */
     public List<Plugin> getAllPlugins() {
         return Arrays.asList(Bukkit.getPluginManager().getPlugins());
     }
 
-    /**
-     * Tìm plugin theo tên (không phân biệt hoa thường).
-     */
     public Plugin getPlugin(String name) {
         if (name == null || name.trim().isEmpty()) return null;
         Plugin p = Bukkit.getPluginManager().getPlugin(name);
@@ -60,9 +47,6 @@ public class PluginController {
         return null;
     }
 
-    /**
-     * Bật (Enable) một plugin đang bị tắt.
-     */
     public synchronized boolean enablePlugin(String name, StringBuilder log) {
         Plugin plugin = getPlugin(name);
         if (plugin == null) {
@@ -87,9 +71,6 @@ public class PluginController {
         }
     }
 
-    /**
-     * Tắt (Disable) một plugin đang chạy.
-     */
     public synchronized boolean disablePlugin(String name, StringBuilder log) {
         Plugin plugin = getPlugin(name);
         if (plugin == null) {
@@ -114,9 +95,6 @@ public class PluginController {
         }
     }
 
-    /**
-     * Nạp một file plugin .jar mới từ thư mục plugins/ vào server.
-     */
     @SuppressWarnings("deprecation")
     public synchronized boolean loadPlugin(File jarFile, StringBuilder log) {
         if (jarFile == null || !jarFile.exists() || !jarFile.getName().endsWith(".jar")) {
@@ -149,9 +127,6 @@ public class PluginController {
         }
     }
 
-    /**
-     * Nạp plugin theo tên file .jar trong thư mục plugins/.
-     */
     public boolean loadPlugin(String jarFileName, StringBuilder log) {
         if (!jarFileName.endsWith(".jar")) {
             jarFileName += ".jar";
@@ -161,10 +136,6 @@ public class PluginController {
         return loadPlugin(targetFile, log);
     }
 
-    /**
-     * Gỡ bỏ hoàn toàn (Unload) một plugin khỏi bộ nhớ, hủy toàn bộ event,
-     * lệnh và đóng ClassLoader để mở khóa file JAR trên Windows.
-     */
     public synchronized boolean unloadPlugin(String name, StringBuilder log) {
         Plugin plugin = getPlugin(name);
         if (plugin == null) {
@@ -175,7 +146,6 @@ public class PluginController {
         String pluginName = plugin.getName();
         PluginManager pm = Bukkit.getPluginManager();
 
-        // 1. Tắt plugin nếu đang bật
         if (plugin.isEnabled()) {
             try {
                 pm.disablePlugin(plugin);
@@ -184,7 +154,6 @@ public class PluginController {
             }
         }
 
-        // 2. Gỡ bỏ toàn bộ Event Listeners đã đăng ký của plugin
         try {
             for (HandlerList hl : HandlerList.getHandlerLists()) {
                 hl.unregister(plugin);
@@ -193,12 +162,10 @@ public class PluginController {
             logger.warning("Lỗi khi unregister listeners của " + pluginName + ": " + t.getMessage());
         }
 
-        // 3. Hủy bỏ toàn bộ Task Scheduler đang chạy của plugin
         try {
             Bukkit.getScheduler().cancelTasks(plugin);
         } catch (Throwable ignored) {}
 
-        // 4. Gỡ bỏ toàn bộ Commands do plugin đăng ký vào CommandMap
         try {
             CommandMap map = ReflectionUtil.getCommandMap();
             Map<String, Command> knownCommands = ReflectionUtil.getKnownCommands();
@@ -223,14 +190,11 @@ public class PluginController {
             logger.warning("Lỗi khi unregister commands của " + pluginName + ": " + t.getMessage());
         }
 
-        // 5. Xóa khỏi danh sách plugins và lookupNames của PluginManager
         removeFromPluginManager(pm, plugin);
 
-        // 6. Đóng ClassLoader để mở khóa file JAR trên Windows
         ClassLoader cl = plugin.getClass().getClassLoader();
         if (cl != null) {
             try {
-                // Xóa tham chiếu plugin trong ClassLoader để tránh rò rỉ bộ nhớ
                 Field pluginField = cl.getClass().getDeclaredField("plugin");
                 pluginField.setAccessible(true);
                 pluginField.set(cl, null);
@@ -253,7 +217,6 @@ public class PluginController {
             }
         }
 
-        // Kích hoạt GC để giải phóng triệt để file descriptor trên Windows
         System.gc();
 
         if (log != null) {
@@ -262,9 +225,6 @@ public class PluginController {
         return true;
     }
 
-    /**
-     * Nạp lại (Reload) một plugin bằng cách Unload rồi Nạp lại từ file JAR.
-     */
     public synchronized boolean reloadPlugin(String name, StringBuilder log) {
         Plugin plugin = getPlugin(name);
         if (plugin == null) {
@@ -296,13 +256,9 @@ public class PluginController {
         }
     }
 
-    /**
-     * Định vị file .jar của một plugin đã cài đặt
-     */
     public File getPluginFile(Plugin plugin) {
         if (plugin == null) return null;
 
-        // 1. Thử gọi JavaPlugin.getFile()
         if (plugin instanceof JavaPlugin jp) {
             try {
                 Method getFileMethod = JavaPlugin.class.getDeclaredMethod("getFile");
@@ -312,7 +268,6 @@ public class PluginController {
             } catch (Throwable ignored) {}
         }
 
-        // 2. Thử lấy từ CodeSource Location
         try {
             java.security.CodeSource cs = plugin.getClass().getProtectionDomain().getCodeSource();
             if (cs != null && cs.getLocation() != null) {
@@ -323,7 +278,6 @@ public class PluginController {
             }
         } catch (Throwable ignored) {}
 
-        // 3. Quét trong thư mục plugins/
         File pluginsDir = hostPlugin.getDataFolder().getParentFile();
         File direct = new File(pluginsDir, plugin.getName() + ".jar");
         if (direct.exists()) return direct;
@@ -348,9 +302,6 @@ public class PluginController {
         return null;
     }
 
-    /**
-     * Tìm danh sách các plugin khác đang phụ thuộc (depend) vào plugin này.
-     */
     @SuppressWarnings("deprecation")
     public List<String> getDependentPlugins(String pluginName) {
         List<String> dependents = new ArrayList<>();
@@ -363,9 +314,6 @@ public class PluginController {
         return dependents;
     }
 
-    /**
-     * Lấy danh sách toàn bộ các file .jar có trong thư mục plugins/.
-     */
     public List<File> getAvailableJarFiles() {
         File pluginsDir = hostPlugin.getDataFolder().getParentFile();
         if (pluginsDir == null || !pluginsDir.exists()) return Collections.emptyList();
@@ -373,9 +321,6 @@ public class PluginController {
         return jars != null ? Arrays.asList(jars) : Collections.emptyList();
     }
 
-    /**
-     * Lấy thông tin cấu trúc chi tiết của 1 plugin.
-     */
     @SuppressWarnings("deprecation")
     public Map<String, Object> getPluginDetails(String name) {
         Plugin plugin = getPlugin(name);

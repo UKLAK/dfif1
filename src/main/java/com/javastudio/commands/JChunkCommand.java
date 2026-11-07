@@ -12,12 +12,10 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 
+import java.io.File;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * Lệnh điều khiển FastBlockEngine và quản lý Snapshot đấu trường trong RAM (/jchunk, /jc, /jarena).
- */
 public final class JChunkCommand implements CommandExecutor, TabCompleter {
 
     private final FastBlockEngine engine;
@@ -48,10 +46,14 @@ public final class JChunkCommand implements CommandExecutor, TabCompleter {
         switch (sub) {
             case "pos1" -> handlePos(sender, true);
             case "pos2" -> handlePos(sender, false);
-            case "snapshot", "save" -> handleSnapshot(sender, args);
-            case "restore", "load" -> handleRestore(sender, args);
+            case "snapshot", "snap" -> handleSnapshot(sender, args);
+            case "restore" -> handleRestore(sender, args);
             case "fill", "set" -> handleFill(sender, args);
             case "replace" -> handleReplace(sender, args);
+            case "undo" -> handleUndo(sender);
+            case "redo" -> handleRedo(sender);
+            case "export", "save" -> handleExport(sender, args);
+            case "import", "load" -> handleImport(sender, args);
             case "list" -> handleList(sender);
             case "delete", "remove" -> handleDelete(sender, args);
             default -> sendHelp(sender);
@@ -95,7 +97,6 @@ public final class JChunkCommand implements CommandExecutor, TabCompleter {
         World world = player.getWorld();
         Location p1, p2;
 
-        // Nếu nhập bán kính Chunk (vd: /jchunk snapshot arena1 2), tự động lấy vùng quanh người chơi
         if (args.length >= 3) {
             try {
                 int radius = Math.max(0, Math.min(10, Integer.parseInt(args[2])));
@@ -140,6 +141,19 @@ public final class JChunkCommand implements CommandExecutor, TabCompleter {
             return;
         }
         String id = args[1];
+        ArenaSnapshot snap = engine.getSnapshot(id);
+        if (snap == null) {
+            sender.sendMessage("§cKhông tìm thấy snapshot: " + id);
+            return;
+        }
+
+        if (sender instanceof Player p) {
+            World w = p.getWorld();
+            Location p1 = new Location(w, snap.minX, snap.minY, snap.minZ);
+            Location p2 = new Location(w, snap.maxX, snap.maxY, snap.maxZ);
+            engine.captureTempSnapshot("undo_" + System.currentTimeMillis(), w, p1, p2).thenAccept(u -> engine.pushUndo(p.getUniqueId(), u));
+        }
+
         engine.restoreSnapshot(id).whenComplete((res, err) -> {
             if (err != null) {
                 sender.sendMessage("§c[JChunk] Không thể khôi phục: " + err.getMessage());
@@ -173,6 +187,9 @@ public final class JChunkCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
+        engine.captureTempSnapshot("undo_fill_" + System.currentTimeMillis(), sel.pos1.getWorld(), sel.pos1, sel.pos2)
+                .thenAccept(u -> engine.pushUndo(player.getUniqueId(), u));
+
         engine.fillCuboid(sel.pos1.getWorld(), sel.pos1, sel.pos2, mat).whenComplete((res, err) -> {
             if (err != null) {
                 sender.sendMessage("§cLỗi khi lấp đầy khối: " + err.getMessage());
@@ -180,7 +197,7 @@ public final class JChunkCommand implements CommandExecutor, TabCompleter {
             }
             sender.sendMessage(String.format(
                     Locale.US,
-                    "§a[JChunk] §fĐã đặt §e%,d khối %s §ftrên §b%d Chunks §fchỉ trong §a%.2f ms§f!",
+                    "§a[JChunk] §fĐã đặt §e%,d khối %s §ftrên §b%d Chunks §fchỉ trong §a%.2f ms§f! §7(Dùng §f/jchunk undo §7để hoàn tác)",
                     res.modifiedBlocks(), mat.name(), res.affectedChunks(), res.elapsedMs()
             ));
         });
@@ -207,6 +224,9 @@ public final class JChunkCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
+        engine.captureTempSnapshot("undo_rep_" + System.currentTimeMillis(), sel.pos1.getWorld(), sel.pos1, sel.pos2)
+                .thenAccept(u -> engine.pushUndo(player.getUniqueId(), u));
+
         engine.replaceCuboid(sel.pos1.getWorld(), sel.pos1, sel.pos2, fromMat, toMat.createBlockData())
                 .whenComplete((res, err) -> {
                     if (err != null) {
@@ -215,30 +235,116 @@ public final class JChunkCommand implements CommandExecutor, TabCompleter {
                     }
                     sender.sendMessage(String.format(
                             Locale.US,
-                            "§a[JChunk] §fĐã thay thế §e%,d khối §f(%s → %s) trong §a%.2f ms§f!",
+                            "§a[JChunk] §fĐã thay thế §e%,d khối §f(%s → %s) trong §a%.2f ms§f! §7(Dùng §f/jchunk undo §7để hoàn tác)",
                             res.modifiedBlocks(), fromMat.name(), toMat.name(), res.elapsedMs()
                     ));
                 });
     }
 
+    private void handleUndo(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("§cChỉ người chơi mới có thể dùng lệnh hoàn tác.");
+            return;
+        }
+        engine.undo(player.getUniqueId()).whenComplete((res, err) -> {
+            if (err != null) {
+                player.sendMessage("§cLỗi khi hoàn tác: " + err.getMessage());
+            } else if (res.modifiedBlocks() == 0 && res.affectedChunks() == 0) {
+                player.sendMessage("§7[JChunk] Không có hành động nào gần đây để hoàn tác.");
+            } else {
+                player.sendMessage(String.format(Locale.US, "§a[JChunk] §fĐã hoàn tác §e%,d khối §ftrên §b%d Chunks §ftrong §e%.2f ms§f!",
+                        res.modifiedBlocks(), res.affectedChunks(), res.elapsedMs()));
+            }
+        });
+    }
+
+    private void handleRedo(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("§cChỉ người chơi mới có thể dùng lệnh làm lại.");
+            return;
+        }
+        engine.redo(player.getUniqueId()).whenComplete((res, err) -> {
+            if (err != null) {
+                player.sendMessage("§cLỗi khi làm lại: " + err.getMessage());
+            } else if (res.modifiedBlocks() == 0 && res.affectedChunks() == 0) {
+                player.sendMessage("§7[JChunk] Không có thao tác nào để làm lại.");
+            } else {
+                player.sendMessage(String.format(Locale.US, "§a[JChunk] §fĐã làm lại §e%,d khối §ftrên §b%d Chunks §ftrong §e%.2f ms§f!",
+                        res.modifiedBlocks(), res.affectedChunks(), res.elapsedMs()));
+            }
+        });
+    }
+
+    private void handleExport(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage("§cCú pháp: /jchunk export <tên_snapshot> [tên_file]");
+            return;
+        }
+        String id = args[1];
+        String fileName = args.length >= 3 ? args[2] : id;
+        if (!fileName.endsWith(".jchunk")) fileName += ".jchunk";
+
+        File folder = new File(com.javastudio.JavaStudioPlugin.getInstance().getDataFolder(), "snapshots");
+        folder.mkdirs();
+        File targetFile = new File(folder, fileName);
+        if (!com.javastudio.security.SecuritySandbox.isPathSafe(folder, targetFile)) {
+            sender.sendMessage("§c[JChunk] Tên tệp không hợp lệ (Phát hiện Path Traversal)!");
+            return;
+        }
+
+        try {
+            engine.saveSnapshotToFile(id, targetFile);
+            sender.sendMessage("§a[JChunk] §fĐã xuất snapshot §e" + id + " §fra tệp §bplugins/JavaStudio/snapshots/" + targetFile.getName() + " §f(" + Math.max(1, targetFile.length() / 1024) + " KB)!");
+        } catch (Exception e) {
+            sender.sendMessage("§c[JChunk] Lỗi khi lưu file snapshot: " + e.getMessage());
+        }
+    }
+
+    private void handleImport(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage("§cCú pháp: /jchunk import <tên_file> [tên_snapshot_mới]");
+            return;
+        }
+        String fileName = args[1];
+        if (!fileName.endsWith(".jchunk")) fileName += ".jchunk";
+        String overrideId = args.length >= 3 ? args[2] : null;
+
+        File folder = new File(com.javastudio.JavaStudioPlugin.getInstance().getDataFolder(), "snapshots");
+        folder.mkdirs();
+        File sourceFile = new File(folder, fileName);
+        if (!com.javastudio.security.SecuritySandbox.isPathSafe(folder, sourceFile)) {
+            sender.sendMessage("§c[JChunk] Tên tệp không hợp lệ (Phát hiện Path Traversal)!");
+            return;
+        }
+
+        try {
+            ArenaSnapshot snap = engine.loadSnapshotFromFile(sourceFile, overrideId);
+            sender.sendMessage(String.format(Locale.US, "§a[JChunk] §fĐã nạp snapshot §e'%s' §ftừ file §b%s §fvào Off-Heap RAM! (§f%,d khối §7/ §a%.2f KB§f)",
+                    snap.id, sourceFile.getName(), snap.totalBlocks, snap.getMemoryUsageKb()));
+        } catch (Exception e) {
+            sender.sendMessage("§c[JChunk] Không thể nạp file snapshot: " + e.getMessage());
+        }
+    }
+
     private void handleList(CommandSender sender) {
         Collection<ArenaSnapshot> all = engine.getAllSnapshots();
         if (all.isEmpty()) {
-            sender.sendMessage("§7[JChunk] Hiện chưa có Snapshot đấu trường nào được lưu trong RAM.");
+            sender.sendMessage(String.format(Locale.US, "§7[JChunk] Hiện chưa có Snapshot đấu trường nào (Off-Heap Undo/Redo đang giữ: §b%.2f KB§7).", engine.getOffHeapBytesUsed() / 1024.0));
             return;
         }
-        sender.sendMessage("§8§m------------§r §b§lDANH SÁCH SNAPSHOT ĐẤU TRƯỜNG (RAM) §8§m------------");
+        sender.sendMessage("§8§m----------§r §b§lDANH SÁCH SNAPSHOT (OFF-HEAP DIRECT RAM) §8§m----------");
         double totalKb = 0;
         for (ArenaSnapshot s : all) {
             double kb = s.getMemoryUsageKb();
             totalKb += kb;
             sender.sendMessage(String.format(
                     Locale.US,
-                    " §e• %s §7[World: §f%s§7] §8- §b%,d khối §7(%d Chunks) §8- §a%.2f KB",
+                    " §e• %s §7[World: §f%s§7] §8- §b%,d khối §7(%d Chunks) §8- §a%.2f KB §8(Off-Heap)",
                     s.id, s.worldName, s.totalBlocks, s.chunks.size(), kb
             ));
         }
-        sender.sendMessage(String.format(Locale.US, "§7Tổng dung lượng RAM tiêu thụ: §a%.2f KB §7(%d snapshots)", totalKb, all.size()));
+        sender.sendMessage(String.format(Locale.US, "§7Snapshot Off-Heap RAM: §a%.2f KB §7(%d snapshots) §8| §7Tổng Direct Buffer: §b%.2f KB §8(0%% GC Pressure)",
+                totalKb, all.size(), engine.getOffHeapBytesUsed() / 1024.0));
     }
 
     private void handleDelete(CommandSender sender, String[] args) {
@@ -258,25 +364,35 @@ public final class JChunkCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(" §b/jchunk pos1 §8| §bpos2 §7- Đặt 2 góc tọa độ vùng chọn 3D");
         sender.sendMessage(" §b/jchunk fill <Material> §7- Lấp đầy vùng chọn siêu tốc không tụt TPS");
         sender.sendMessage(" §b/jchunk replace <Cũ> <Mới> §7- Thay thế khối trong vùng chọn tức thì");
-        sender.sendMessage(" §b/jchunk snapshot <tên> [bán_kính_chunk] §7- Nén trạng thái bản đồ vào RAM");
-        sender.sendMessage(" §b/jchunk restore <tên> §7- Khôi phục bản đồ đấu trường trong vài mili-giây");
+        sender.sendMessage(" §b/jchunk undo §8| §bredo §7- Hoàn tác hoặc làm lại thao tác khối");
+        sender.sendMessage(" §b/jchunk snapshot <tên> [bán_kính] §7- Nén trạng thái bản đồ vào RAM");
+        sender.sendMessage(" §b/jchunk restore <tên> §7- Khôi phục bản đồ đấu trường trong vài ms");
+        sender.sendMessage(" §b/jchunk export <tên> [file] §7- Xuất snapshot từ RAM ra tệp .jchunk");
+        sender.sendMessage(" §b/jchunk import <file> [tên] §7- Nạp snapshot từ tệp .jchunk vào RAM");
         sender.sendMessage(" §b/jchunk list §8| §bdelete <tên> §7- Xem dung lượng RAM và quản lý snapshots");
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return List.of("pos1", "pos2", "snapshot", "restore", "fill", "replace", "list", "delete").stream()
+            return List.of("pos1", "pos2", "snapshot", "restore", "fill", "replace", "undo", "redo", "export", "import", "list", "delete").stream()
                     .filter(s -> s.startsWith(args[0].toLowerCase()))
                     .collect(Collectors.toList());
         }
         if (args.length == 2) {
             String sub = args[0].toLowerCase();
-            if (sub.equals("restore") || sub.equals("delete")) {
+            if (sub.equals("restore") || sub.equals("delete") || sub.equals("export")) {
                 return engine.getAllSnapshots().stream()
                         .map(s -> s.id)
                         .filter(id -> id.toLowerCase().startsWith(args[1].toLowerCase()))
                         .toList();
+            }
+            if (sub.equals("import")) {
+                File folder = new File(com.javastudio.JavaStudioPlugin.getInstance().getDataFolder(), "snapshots");
+                if (folder.exists() && folder.isDirectory()) {
+                    String[] files = folder.list((dir, name) -> name.endsWith(".jchunk"));
+                    if (files != null) return Arrays.asList(files);
+                }
             }
             if (sub.equals("fill") || sub.equals("replace")) {
                 String prefix = args[1].toUpperCase();

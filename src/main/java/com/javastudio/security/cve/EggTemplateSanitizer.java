@@ -3,12 +3,6 @@ package com.javastudio.security.cve;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
-/**
- * Phòng thủ chống XSS qua Egg Import / Template Blueprint (CVE-2024-34067)
- * và Stored XSS qua Server Name / API Key Form (CVE-2025-5990).
- * Kiểm soát và làm sạch toàn bộ dữ liệu JSON egg, startup command, biến môi trường,
- * và các trường dữ liệu form trên Web IDE / Control Panel.
- */
 public final class EggTemplateSanitizer {
 
     private EggTemplateSanitizer() {}
@@ -28,9 +22,6 @@ public final class EggTemplateSanitizer {
             Pattern.CASE_INSENSITIVE
     );
 
-    /**
-     * Làm sạch đầu vào từ các form nhập liệu (Server Name, API Key, Project Name, Description).
-     */
     public static String sanitizeFormInput(String input) {
         if (input == null) return "";
         String clean = XSS_TAG_PATTERN.matcher(input).replaceAll("");
@@ -39,9 +30,6 @@ public final class EggTemplateSanitizer {
         return escapeHtml(clean.trim());
     }
 
-    /**
-     * Kiểm tra xem cấu hình Egg JSON hoặc Blueprint có chứa mã độc XSS hay không.
-     */
     public static boolean containsDangerousEggPayload(String json) {
         if (json == null || json.isBlank()) return false;
         String lower = json.toLowerCase(Locale.ROOT);
@@ -51,9 +39,6 @@ public final class EggTemplateSanitizer {
         return lower.contains("<script") || lower.contains("javascript:") || lower.contains("onerror=");
     }
 
-    /**
-     * Escape an toàn các ký tự đặc biệt sang HTML Entities.
-     */
     public static String escapeHtml(String text) {
         if (text == null) return "";
         StringBuilder sb = new StringBuilder(text.length() + 16);

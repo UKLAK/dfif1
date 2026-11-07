@@ -1,5 +1,6 @@
 package com.javastudio.pipeline;
 
+import com.javastudio.utils.FoliaAutoRegionizer;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -9,86 +10,45 @@ import org.bukkit.block.Block;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.plugin.Plugin;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.io.*;
 import java.lang.reflect.Method;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.InflaterInputStream;
 
-/**
- * FastBlockEngine: Thao tác khối siêu tốc (FastBlockAPI) và phục hồi bản đồ đấu trường trong RAM
- * sử dụng kỹ thuật nén Palette (Bảng màu khối) + LZ77 Deflater giúp tiết kiệm 95% RAM
- * và hỗ trợ đa luồng vùng Folia (Regionized Multithreading).
- */
 public final class FastBlockEngine {
+
+    private static final AtomicLong TOTAL_OFF_HEAP_BYTES = new AtomicLong(0);
 
     private final Plugin plugin;
     private final Map<String, ArenaSnapshot> snapshots = new ConcurrentHashMap<>();
     private final Map<UUID, CuboidSelection> selections = new ConcurrentHashMap<>();
 
-    // Cờ nhận diện môi trường Folia
-    private final boolean isFolia;
-    private Method regionSchedulerMethod;
-    private Method regionExecuteMethod;
+    private final Map<UUID, Deque<ArenaSnapshot>> undoStacks = new ConcurrentHashMap<>();
+    private final Map<UUID, Deque<ArenaSnapshot>> redoStacks = new ConcurrentHashMap<>();
 
     public FastBlockEngine(Plugin plugin) {
         this.plugin = plugin;
-        this.isFolia = detectFolia();
     }
 
-    private boolean detectFolia() {
-        try {
-            regionSchedulerMethod = Bukkit.class.getMethod("getRegionScheduler");
-            Object scheduler = regionSchedulerMethod.invoke(null);
-            regionExecuteMethod = scheduler.getClass().getMethod("execute", Plugin.class, World.class, int.class, int.class, Runnable.class);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    /**
-     * Điều phối tác vụ an toàn trên cả Spigot/Paper lẫn Folia theo tọa độ Chunk
-     */
     public void executeInChunkRegion(World world, int chunkX, int chunkZ, Runnable task) {
-        if (isFolia && regionExecuteMethod != null) {
-            try {
-                Object scheduler = regionSchedulerMethod.invoke(null);
-                regionExecuteMethod.invoke(scheduler, plugin, world, chunkX, chunkZ, task);
-                return;
-            } catch (Exception ignored) {}
-        }
-        if (Bukkit.isPrimaryThread()) {
-            task.run();
-        } else {
-            Bukkit.getScheduler().runTask(plugin, task);
-        }
+        FoliaAutoRegionizer.runAtChunk(plugin, world, chunkX, chunkZ, task);
     }
 
-    // =========================================================================
-    // I. API THAO TÁC KHỐI SIÊU TỐC (DÀNH CHO DYNAMIC PLUGIN & /JCHUNK)
-    // =========================================================================
-
-    /**
-     * Lấp đầy một vùng 3D bằng Material chỉ định với tốc độ hàng trăm nghìn khối/giây
-     */
     public CompletableFuture<BatchResult> fillCuboid(World world, Location pos1, Location pos2, Material material) {
         return replaceCuboid(world, pos1, pos2, null, material.createBlockData());
     }
 
-    /**
-     * Thay thế khối trong vùng 3D (nếu fromFilter == null thì ghi đè toàn bộ)
-     */
     public CompletableFuture<BatchResult> replaceCuboid(World world, Location pos1, Location pos2,
                                                         Material fromFilter, BlockData targetData) {
-        CompletableFuture<BatchResult> future = new CompletableFuture<>();
         long startNano = System.nanoTime();
 
         int minX = Math.min(pos1.getBlockX(), pos2.getBlockX());
@@ -98,69 +58,43 @@ public final class FastBlockEngine {
         int maxY = Math.min(world.getMaxHeight() - 1, Math.max(pos1.getBlockY(), pos2.getBlockY()));
         int maxZ = Math.max(pos1.getBlockZ(), pos2.getBlockZ());
 
-        int minChunkX = minX >> 4;
-        int maxChunkX = maxX >> 4;
-        int minChunkZ = minZ >> 4;
-        int maxChunkZ = maxZ >> 4;
-
-        int totalChunks = (maxChunkX - minChunkX + 1) * (maxChunkZ - minChunkZ + 1);
-        AtomicInteger remainingChunks = new AtomicInteger(totalChunks);
         AtomicInteger modifiedBlocks = new AtomicInteger(0);
 
-        for (int cx = minChunkX; cx <= maxChunkX; cx++) {
-            for (int cz = minChunkZ; cz <= maxChunkZ; cz++) {
-                final int chunkX = cx;
-                final int chunkZ = cz;
-
-                executeInChunkRegion(world, chunkX, chunkZ, () -> {
-                    try {
-                        Chunk chunk = world.getChunkAt(chunkX, chunkZ);
-                        int startX = Math.max(minX, chunkX << 4);
-                        int endX = Math.min(maxX, (chunkX << 4) + 15);
-                        int startZ = Math.max(minZ, chunkZ << 4);
-                        int endZ = Math.min(maxZ, (chunkZ << 4) + 15);
-
-                        int localModified = 0;
-                        for (int y = minY; y <= maxY; y++) {
-                            for (int x = startX; x <= endX; x++) {
-                                for (int z = startZ; z <= endZ; z++) {
-                                    Block block = chunk.getBlock(x & 15, y, z & 15);
-                                    if (fromFilter != null && block.getType() != fromFilter) {
-                                        continue;
-                                    }
+        return FoliaAutoRegionizer.runInCuboid(plugin, world, minX, minY, minZ, maxX, maxY, maxZ,
+                (chunk, startX, endX, minY1, maxY1, startZ, endZ) -> {
+                    int count = 0;
+                    for (int y = minY1; y <= maxY1; y++) {
+                        for (int x = startX; x <= endX; x++) {
+                            for (int z = startZ; z <= endZ; z++) {
+                                Block block = chunk.getBlock(x & 15, y, z & 15);
+                                if (fromFilter == null || block.getType() == fromFilter) {
                                     if (!block.getBlockData().matches(targetData)) {
-                                        // applyPhysics = false giúp bỏ qua tính toán vật lý & láng giềng
                                         block.setBlockData(targetData, false);
-                                        localModified++;
+                                        count++;
                                     }
                                 }
                             }
                         }
-
-                        if (localModified > 0) {
-                            modifiedBlocks.addAndGet(localModified);
-                            world.refreshChunk(chunkX, chunkZ);
-                        }
-                    } finally {
-                        if (remainingChunks.decrementAndGet() == 0) {
-                            double elapsedMs = (System.nanoTime() - startNano) / 1_000_000.0;
-                            future.complete(new BatchResult(modifiedBlocks.get(), totalChunks, elapsedMs));
-                        }
                     }
-                });
-            }
-        }
-        return future;
+                    if (count > 0) {
+                        modifiedBlocks.addAndGet(count);
+                        world.refreshChunk(chunk.getX(), chunk.getZ());
+                    }
+                }).thenApply(totalChunks -> {
+            double elapsedMs = (System.nanoTime() - startNano) / 1_000_000.0;
+            return new BatchResult(modifiedBlocks.get(), totalChunks, elapsedMs);
+        });
     }
 
-    // =========================================================================
-    // II. HỆ THỐNG SNAPSHOT & RESTORE ĐẤU TRƯỜNG TRONG RAM (PALETTE + LZ77)
-    // =========================================================================
-
-    /**
-     * Chụp ảnh trạng thái vùng chọn và nén Palette vào RAM
-     */
     public CompletableFuture<ArenaSnapshot> createSnapshot(String id, World world, Location pos1, Location pos2) {
+        return createArenaSnapshot(id, world, pos1, pos2);
+    }
+
+    public CompletableFuture<ArenaSnapshot> createArenaSnapshot(String id, World world, Location pos1, Location pos2) {
+        return captureRegionSnapshot(id, world, pos1, pos2, true);
+    }
+
+    private CompletableFuture<ArenaSnapshot> captureRegionSnapshot(String id, World world, Location pos1, Location pos2, boolean registerGlobal) {
         CompletableFuture<ArenaSnapshot> future = new CompletableFuture<>();
         long startNano = System.nanoTime();
 
@@ -171,32 +105,29 @@ public final class FastBlockEngine {
         int maxY = Math.min(world.getMaxHeight() - 1, Math.max(pos1.getBlockY(), pos2.getBlockY()));
         int maxZ = Math.max(pos1.getBlockZ(), pos2.getBlockZ());
 
-        int minChunkX = minX >> 4;
-        int maxChunkX = maxX >> 4;
-        int minChunkZ = minZ >> 4;
-        int maxChunkZ = maxZ >> 4;
+        int minCx = minX >> 4;
+        int maxCx = maxX >> 4;
+        int minCz = minZ >> 4;
+        int maxCz = maxZ >> 4;
 
-        int totalChunks = (maxChunkX - minChunkX + 1) * (maxChunkZ - minChunkZ + 1);
-        AtomicInteger remaining = new AtomicInteger(totalChunks);
         Map<Long, CompressedChunkSlice> chunkSlices = new ConcurrentHashMap<>();
+        int totalChunks = (maxCx - minCx + 1) * (maxCz - minCz + 1);
+        AtomicInteger remaining = new AtomicInteger(totalChunks);
         AtomicInteger totalBlocksRecorded = new AtomicInteger(0);
 
-        for (int cx = minChunkX; cx <= maxChunkX; cx++) {
-            for (int cz = minChunkZ; cz <= maxChunkZ; cz++) {
+        for (int cx = minCx; cx <= maxCx; cx++) {
+            for (int cz = minCz; cz <= maxCz; cz++) {
                 final int chunkX = cx;
                 final int chunkZ = cz;
 
-                executeInChunkRegion(world, chunkX, chunkZ, () -> {
-                    try {
-                        Chunk chunk = world.getChunkAt(chunkX, chunkZ);
-                        int startX = Math.max(minX, chunkX << 4);
-                        int endX = Math.min(maxX, (chunkX << 4) + 15);
-                        int startZ = Math.max(minZ, chunkZ << 4);
-                        int endZ = Math.min(maxZ, (chunkZ << 4) + 15);
+                int startX = Math.max(minX, chunkX << 4);
+                int endX = Math.min(maxX, (chunkX << 4) + 15);
+                int startZ = Math.max(minZ, chunkZ << 4);
+                int endZ = Math.min(maxZ, (chunkZ << 4) + 15);
 
-                        CompressedChunkSlice slice = compressChunkSlice(
-                                chunk, startX, endX, minY, maxY, startZ, endZ
-                        );
+                FoliaAutoRegionizer.runAtChunkAsync(plugin, world, chunkX, chunkZ, chunk -> {
+                    try {
+                        CompressedChunkSlice slice = compressChunkSlice(chunk, startX, endX, minY, maxY, startZ, endZ);
                         chunkSlices.put(chunkKey(chunkX, chunkZ), slice);
                         totalBlocksRecorded.addAndGet(slice.blockCount);
                     } catch (Exception e) {
@@ -209,7 +140,10 @@ public final class FastBlockEngine {
                                     minX, minY, minZ, maxX, maxY, maxZ,
                                     totalBlocksRecorded.get(), chunkSlices, elapsedMs
                             );
-                            snapshots.put(id.toLowerCase(Locale.ROOT), snap);
+                            if (registerGlobal) {
+                                ArenaSnapshot old = snapshots.put(id.toLowerCase(Locale.ROOT), snap);
+                                if (old != null) old.release();
+                            }
                             future.complete(snap);
                         }
                     }
@@ -219,14 +153,15 @@ public final class FastBlockEngine {
         return future;
     }
 
-    /**
-     * Khôi phục nguyên trạng đấu trường từ bản nén trong RAM
-     */
     public CompletableFuture<BatchResult> restoreSnapshot(String id) {
         ArenaSnapshot snap = snapshots.get(id.toLowerCase(Locale.ROOT));
         if (snap == null) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("Không tồn tại snapshot: " + id));
         }
+        return restoreSnapshotDirect(snap);
+    }
+
+    public CompletableFuture<BatchResult> restoreSnapshotDirect(ArenaSnapshot snap) {
         World world = Bukkit.getWorld(snap.worldName);
         if (world == null) {
             return CompletableFuture.failedFuture(new IllegalStateException("Thế giới không còn tồn tại: " + snap.worldName));
@@ -244,9 +179,8 @@ public final class FastBlockEngine {
             int chunkZ = (int) key;
             CompressedChunkSlice slice = entry.getValue();
 
-            executeInChunkRegion(world, chunkX, chunkZ, () -> {
+            FoliaAutoRegionizer.runAtChunkAsync(plugin, world, chunkX, chunkZ, chunk -> {
                 try {
-                    Chunk chunk = world.getChunkAt(chunkX, chunkZ);
                     int modified = decompressAndApplySlice(chunk, slice);
                     if (modified > 0) {
                         changedBlocks.addAndGet(modified);
@@ -265,9 +199,153 @@ public final class FastBlockEngine {
         return future;
     }
 
-    /**
-     * Nén dữ liệu khối trong 1 Chunk bằng Bảng màu (Palette) + Deflater BEST_SPEED
-     */
+    public CompletableFuture<ArenaSnapshot> captureTempSnapshot(String id, World world, Location pos1, Location pos2) {
+        return captureRegionSnapshot(id, world, pos1, pos2, false);
+    }
+
+    public void pushUndo(UUID playerUuid, ArenaSnapshot snapshot) {
+        if (playerUuid == null || snapshot == null) return;
+        Deque<ArenaSnapshot> stack = undoStacks.computeIfAbsent(playerUuid, k -> new ArrayDeque<>());
+        synchronized (stack) {
+            stack.push(snapshot);
+            while (stack.size() > 15) {
+                ArenaSnapshot evicted = stack.removeLast();
+                if (evicted != null) evicted.release();
+            }
+        }
+    }
+
+    public CompletableFuture<BatchResult> undo(UUID playerUuid) {
+        Deque<ArenaSnapshot> stack = undoStacks.get(playerUuid);
+        if (stack == null) {
+            return CompletableFuture.completedFuture(new BatchResult(0, 0, 0));
+        }
+        ArenaSnapshot prev;
+        synchronized (stack) {
+            if (stack.isEmpty()) return CompletableFuture.completedFuture(new BatchResult(0, 0, 0));
+            prev = stack.pop();
+        }
+        World world = Bukkit.getWorld(prev.worldName);
+        if (world != null) {
+            Location p1 = new Location(world, prev.minX, prev.minY, prev.minZ);
+            Location p2 = new Location(world, prev.maxX, prev.maxY, prev.maxZ);
+            captureRegionSnapshot("redo_" + System.currentTimeMillis(), world, p1, p2, false).thenAccept(redoSnap -> {
+                Deque<ArenaSnapshot> rStack = redoStacks.computeIfAbsent(playerUuid, k -> new ArrayDeque<>());
+                synchronized (rStack) {
+                    rStack.push(redoSnap);
+                    while (rStack.size() > 15) {
+                        ArenaSnapshot ev = rStack.removeLast();
+                        if (ev != null) ev.release();
+                    }
+                }
+            });
+        }
+        return restoreSnapshotDirect(prev).whenComplete((r, e) -> prev.release());
+    }
+
+    public CompletableFuture<BatchResult> redo(UUID playerUuid) {
+        Deque<ArenaSnapshot> stack = redoStacks.get(playerUuid);
+        if (stack == null) {
+            return CompletableFuture.completedFuture(new BatchResult(0, 0, 0));
+        }
+        ArenaSnapshot next;
+        synchronized (stack) {
+            if (stack.isEmpty()) return CompletableFuture.completedFuture(new BatchResult(0, 0, 0));
+            next = stack.pop();
+        }
+        return restoreSnapshotDirect(next).whenComplete((r, e) -> next.release());
+    }
+
+    public void saveSnapshotToFile(String snapshotId, File file) throws IOException {
+        ArenaSnapshot snap = getSnapshot(snapshotId);
+        if (snap == null) throw new IllegalArgumentException("Không tìm thấy snapshot: " + snapshotId);
+        if (file.getParentFile() != null) file.getParentFile().mkdirs();
+
+        try (DataOutputStream dos = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)))) {
+            dos.writeInt(0x4A424C4B);
+            dos.writeInt(1);
+            dos.writeUTF(snap.id);
+            dos.writeUTF(snap.worldName);
+            dos.writeInt(snap.minX);
+            dos.writeInt(snap.minY);
+            dos.writeInt(snap.minZ);
+            dos.writeInt(snap.maxX);
+            dos.writeInt(snap.maxY);
+            dos.writeInt(snap.maxZ);
+            dos.writeInt(snap.totalBlocks);
+            dos.writeDouble(snap.captureTimeMs);
+            dos.writeInt(snap.chunks.size());
+
+            for (Map.Entry<Long, CompressedChunkSlice> e : snap.chunks.entrySet()) {
+                dos.writeLong(e.getKey());
+                CompressedChunkSlice s = e.getValue();
+                dos.writeInt(s.startX);
+                dos.writeInt(s.endX);
+                dos.writeInt(s.minY);
+                dos.writeInt(s.maxY);
+                dos.writeInt(s.startZ);
+                dos.writeInt(s.endZ);
+                dos.writeInt(s.blockCount);
+                String[] palette = s.readPalette();
+                dos.writeInt(palette.length);
+                for (String p : palette) {
+                    dos.writeUTF(p);
+                }
+                byte[] cBytes = s.getCompressedBytes();
+                dos.writeInt(cBytes.length);
+                dos.write(cBytes);
+            }
+        }
+    }
+
+    public ArenaSnapshot loadSnapshotFromFile(File file, String overrideId) throws IOException {
+        if (!file.exists()) throw new FileNotFoundException("Tệp không tồn tại: " + file.getPath());
+
+        try (DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(file)))) {
+            int magic = dis.readInt();
+            if (magic != 0x4A424C4B) throw new IOException("Định dạng file FastBlock không hợp lệ!");
+            dis.readInt();
+            String savedId = dis.readUTF();
+            String id = (overrideId != null && !overrideId.isBlank()) ? overrideId : savedId;
+            String worldName = dis.readUTF();
+            int minX = dis.readInt();
+            int minY = dis.readInt();
+            int minZ = dis.readInt();
+            int maxX = dis.readInt();
+            int maxY = dis.readInt();
+            int maxZ = dis.readInt();
+            int totalBlocks = dis.readInt();
+            double captureTimeMs = dis.readDouble();
+            int chunkCount = dis.readInt();
+
+            Map<Long, CompressedChunkSlice> chunks = new HashMap<>(chunkCount);
+            for (int i = 0; i < chunkCount; i++) {
+                long key = dis.readLong();
+                int sX = dis.readInt();
+                int eX = dis.readInt();
+                int mY = dis.readInt();
+                int mxY = dis.readInt();
+                int sZ = dis.readInt();
+                int eZ = dis.readInt();
+                int bCount = dis.readInt();
+                int palLen = dis.readInt();
+                String[] palette = new String[palLen];
+                for (int p = 0; p < palLen; p++) {
+                    palette[p] = dis.readUTF();
+                }
+                int dataLen = dis.readInt();
+                byte[] data = new byte[dataLen];
+                dis.readFully(data);
+                chunks.put(key, new CompressedChunkSlice(sX, eX, mY, mxY, sZ, eZ, bCount, palette, data));
+            }
+
+            ArenaSnapshot snap = new ArenaSnapshot(id, worldName, minX, minY, minZ, maxX, maxY, maxZ, totalBlocks, chunks, captureTimeMs);
+            ArenaSnapshot old = snapshots.put(id.toLowerCase(Locale.ROOT), snap);
+            if (old != null) old.release();
+            return snap;
+        }
+    }
+
     private CompressedChunkSlice compressChunkSlice(Chunk chunk, int startX, int endX,
                                                     int minY, int maxY, int startZ, int endZ) throws Exception {
         List<String> paletteList = new ArrayList<>();
@@ -309,18 +387,16 @@ public final class FastBlockEngine {
         );
     }
 
-    /**
-     * Giải nén dữ liệu Palette từ RAM và ghi đè trực tiếp vào Chunk
-     */
     private int decompressAndApplySlice(Chunk chunk, CompressedChunkSlice slice) throws Exception {
-        BlockData[] decodedPalette = new BlockData[slice.palette.length];
-        for (int i = 0; i < slice.palette.length; i++) {
-            decodedPalette[i] = Bukkit.createBlockData(slice.palette[i]);
+        String[] paletteStrings = slice.readPalette();
+        BlockData[] decodedPalette = new BlockData[paletteStrings.length];
+        for (int i = 0; i < paletteStrings.length; i++) {
+            decodedPalette[i] = Bukkit.createBlockData(paletteStrings[i]);
         }
 
         int modified = 0;
         try (DataInputStream dis = new DataInputStream(
-                new InflaterInputStream(new ByteArrayInputStream(slice.compressedIndices)))) {
+                new InflaterInputStream(slice.openCompressedStream()))) {
 
             for (int y = slice.minY; y <= slice.maxY; y++) {
                 for (int x = slice.startX; x <= slice.endX; x++) {
@@ -344,10 +420,6 @@ public final class FastBlockEngine {
         return ((long) x << 32) | (z & 0xFFFFFFFFL);
     }
 
-    // =========================================================================
-    // III. QUẢN LÝ VÙNG CHỌN (SELECTION) & TRUY VẤN SNAPSHOT
-    // =========================================================================
-
     public void setPos1(UUID playerUuid, Location loc) {
         selections.computeIfAbsent(playerUuid, k -> new CuboidSelection()).pos1 = loc.clone();
     }
@@ -369,10 +441,39 @@ public final class FastBlockEngine {
     }
 
     public boolean deleteSnapshot(String id) {
-        return snapshots.remove(id.toLowerCase(Locale.ROOT)) != null;
+        ArenaSnapshot removed = snapshots.remove(id.toLowerCase(Locale.ROOT));
+        if (removed != null) {
+            removed.release();
+            return true;
+        }
+        return false;
     }
 
-    // --- Các cấu trúc dữ liệu nội bộ ---
+    public long getOffHeapBytesUsed() {
+        return Math.max(0L, TOTAL_OFF_HEAP_BYTES.get());
+    }
+
+    public void shutdown() {
+        for (ArenaSnapshot s : snapshots.values()) {
+            s.release();
+        }
+        snapshots.clear();
+        for (Deque<ArenaSnapshot> d : undoStacks.values()) {
+            synchronized (d) {
+                for (ArenaSnapshot s : d) s.release();
+                d.clear();
+            }
+        }
+        undoStacks.clear();
+        for (Deque<ArenaSnapshot> d : redoStacks.values()) {
+            synchronized (d) {
+                for (ArenaSnapshot s : d) s.release();
+                d.clear();
+            }
+        }
+        redoStacks.clear();
+        selections.clear();
+    }
 
     public static final class CuboidSelection {
         public Location pos1;
@@ -394,14 +495,39 @@ public final class FastBlockEngine {
 
     public record BatchResult(int modifiedBlocks, int affectedChunks, double elapsedMs) {}
 
+    private static final class DirectByteBufferInputStream extends InputStream {
+        private final ByteBuffer buf;
+
+        DirectByteBufferInputStream(ByteBuffer sliceView) {
+            this.buf = sliceView;
+        }
+
+        @Override
+        public int read() {
+            if (!buf.hasRemaining()) return -1;
+            return buf.get() & 0xFF;
+        }
+
+        @Override
+        public int read(byte[] bytes, int off, int len) {
+            if (!buf.hasRemaining()) return -1;
+            int toRead = Math.min(len, buf.remaining());
+            buf.get(bytes, off, toRead);
+            return toRead;
+        }
+    }
+
     public static final class CompressedChunkSlice {
         public final int startX, endX, minY, maxY, startZ, endZ;
         public final int blockCount;
-        public final String[] palette;
-        public final byte[] compressedIndices;
+        public final int paletteSize;
+        private final int compressedOffset;
+        private final int compressedLength;
+        private volatile ByteBuffer offHeapSegment;
+        private final AtomicBoolean released = new AtomicBoolean(false);
 
         public CompressedChunkSlice(int startX, int endX, int minY, int maxY, int startZ, int endZ,
-                                    int blockCount, String[] palette, byte[] compressedIndices) {
+                                    int blockCount, String[] palette, byte[] compressedData) {
             this.startX = startX;
             this.endX = endX;
             this.minY = minY;
@@ -409,14 +535,88 @@ public final class FastBlockEngine {
             this.startZ = startZ;
             this.endZ = endZ;
             this.blockCount = blockCount;
-            this.palette = palette;
-            this.compressedIndices = compressedIndices;
+            this.paletteSize = palette.length;
+
+            byte[][] encodedPalette = new byte[palette.length][];
+            int paletteByteLen = 4;
+            for (int i = 0; i < palette.length; i++) {
+                encodedPalette[i] = palette[i].getBytes(StandardCharsets.UTF_8);
+                paletteByteLen += 2 + encodedPalette[i].length;
+            }
+
+            this.compressedOffset = paletteByteLen;
+            this.compressedLength = compressedData.length;
+            int totalCapacity = paletteByteLen + compressedData.length;
+
+            ByteBuffer direct = ByteBuffer.allocateDirect(totalCapacity);
+            direct.putInt(palette.length);
+            for (byte[] entry : encodedPalette) {
+                direct.putShort((short) entry.length);
+                direct.put(entry);
+            }
+            direct.put(compressedData);
+            direct.flip();
+
+            this.offHeapSegment = direct;
+            TOTAL_OFF_HEAP_BYTES.addAndGet(totalCapacity);
+        }
+
+        public String[] readPalette() {
+            ByteBuffer dup = ensureOpen().duplicate();
+            dup.position(0);
+            int count = dup.getInt();
+            String[] result = new String[count];
+            for (int i = 0; i < count; i++) {
+                int strLen = dup.getShort() & 0xFFFF;
+                byte[] tmp = new byte[strLen];
+                dup.get(tmp);
+                result[i] = new String(tmp, StandardCharsets.UTF_8);
+            }
+            return result;
+        }
+
+        public InputStream openCompressedStream() {
+            ByteBuffer dup = ensureOpen().duplicate();
+            dup.position(compressedOffset);
+            dup.limit(compressedOffset + compressedLength);
+            return new DirectByteBufferInputStream(dup.slice());
+        }
+
+        public byte[] getCompressedBytes() {
+            ByteBuffer dup = ensureOpen().duplicate();
+            dup.position(compressedOffset);
+            dup.limit(compressedOffset + compressedLength);
+            byte[] copy = new byte[compressedLength];
+            dup.get(copy);
+            return copy;
+        }
+
+        private ByteBuffer ensureOpen() {
+            ByteBuffer buf = this.offHeapSegment;
+            if (buf == null) {
+                throw new IllegalStateException("Snapshot Off-Heap buffer đã được giải phóng.");
+            }
+            return buf;
         }
 
         public long getMemoryBytes() {
-            long bytes = compressedIndices.length + 64L;
-            for (String s : palette) bytes += (s.length() * 2L) + 16L;
-            return bytes;
+            ByteBuffer buf = this.offHeapSegment;
+            return buf != null ? buf.capacity() : 0L;
+        }
+
+        public boolean isOffHeap() {
+            ByteBuffer buf = this.offHeapSegment;
+            return buf != null && buf.isDirect();
+        }
+
+        public void release() {
+            if (released.compareAndSet(false, true)) {
+                ByteBuffer buf = this.offHeapSegment;
+                this.offHeapSegment = null;
+                if (buf != null) {
+                    TOTAL_OFF_HEAP_BYTES.addAndGet(-buf.capacity());
+                }
+            }
         }
     }
 
@@ -452,6 +652,12 @@ public final class FastBlockEngine {
                 totalBytes += slice.getMemoryBytes();
             }
             return totalBytes / 1024.0;
+        }
+
+        public void release() {
+            for (CompressedChunkSlice slice : chunks.values()) {
+                slice.release();
+            }
         }
     }
 }

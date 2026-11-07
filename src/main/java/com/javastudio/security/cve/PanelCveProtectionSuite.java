@@ -7,36 +7,17 @@ import org.bukkit.configuration.file.FileConfiguration;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * Trung Tâm Phòng Thủ Toàn Diện Crafty Controller & Pterodactyl Panel / Wings (PanelCveProtectionSuite).
- * Hợp nhất khả năng chống lại toàn bộ 10+ CVE nguy hiểm nhất hiện nay:
- * 1. CVE-2025-14700: SSTI → RCE qua Webhook Template (CWE-1336)
- * 2. CVE-2026-0963: Path traversal qua File Operations API → RCE (CWE-22)
- * 3. CVE-2026-13716: Path traversal .../...// qua server import + file upload → RCE (CWE-35)
- * 4. CVE-2026-5652: Control plane privilege escalation & embargoed exploit defense
- * 5. CVE-2025-14701: Stored XSS qua Server MOTD (Unauthenticated)
- * 6. CVE-2025-5990: Stored XSS qua Server Name / API Key form
- * 7. CVE-2024-1064: Host header injection → DoS (CWE-644/CWE-116)
- * 8. CVE-2025-49132: Unauthenticated RCE qua /locales/locale.json & pearcmd.php (GHSA-24wv-6c99-f843)
- * 9. CVE-2024-27102: Wings container escape & symlink path traversal
- * 10. CVE-2024-34067: XSS qua import egg / blueprint độc hại
- * 11. CVE-2024-49762: Plaintext password leak trong access logs khi thao tác 2FA
- * 12. GHSA-MGR9-6C2J-JXRQ: Zombie session & lingering SFTP credentials revocation
- */
 public final class PanelCveProtectionSuite {
 
     private final JavaStudioPlugin plugin;
 
-    // Các phân hệ bảo vệ
     private final MotdXssGuardListener motdXssGuardListener;
     private final PterodactylLfiHoneypot pterodactylHoneypot;
     private final WingsSandboxBoundaryGuard wingsSandboxGuard;
     private final SessionRevocationManager sessionRevocationManager;
 
-    // Bộ đếm thống kê vi phạm
     private final CveStats stats = new CveStats();
 
-    // Cấu hình tính năng
     private boolean enabled = true;
     private boolean sstiProtectionEnabled = true;
     private boolean pathTraversalProtectionEnabled = true;
@@ -116,10 +97,8 @@ public final class PanelCveProtectionSuite {
     }
 
     public void init() {
-        // Đăng ký Listener làm sạch MOTD
         plugin.getServer().getPluginManager().registerEvents(motdXssGuardListener, plugin);
 
-        // Bắt đầu task định kỳ quét Zombie Sessions mỗi 10 phút
         reaperTask = PlatformUtil.runTaskTimer(plugin, () -> {
             if (sessionRevocationEnabled) {
                 int purged = sessionRevocationManager.purgeIdleZombieSessions();
@@ -127,7 +106,7 @@ public final class PanelCveProtectionSuite {
                     plugin.getLogger().info("[CVE Defense] Zombie Session Reaper đã giải phóng " + purged + " phiên nhàn rỗi.");
                 }
             }
-        }, 12000L, 12000L); // 10 phút = 12000 ticks
+        }, 12000L, 12000L);
 
         plugin.getLogger().info("╔════════════════════════════════════════════════════════════════╗");
         plugin.getLogger().info("║  [Panel CVE Defense Suite] Đã kích hoạt hệ thống bảo vệ toàn diện ║");
@@ -162,9 +141,6 @@ public final class PanelCveProtectionSuite {
         this.eggSanitizerEnabled = config.getBoolean("cve-defense.cve-2024-34067-egg-xss", true);
     }
 
-    /**
-     * Báo động an ninh: ghi log server và gửi alert về Discord Webhook.
-     */
     public void logAlert(String cveId, String details) {
         plugin.getLogger().warning("[Panel CVE Defense - " + cveId + "] " + details);
         if (plugin.getDiscordWebhook() != null) {
@@ -172,9 +148,6 @@ public final class PanelCveProtectionSuite {
         }
     }
 
-    /**
-     * Kiểm toán an ninh toàn diện cho Panel & Wings.
-     */
     public CveAuditReport performCveAudit() {
         int score = 100;
         List<String> recs = new ArrayList<>();
@@ -210,7 +183,6 @@ public final class PanelCveProtectionSuite {
         return new CveAuditReport(Math.max(0, Math.min(100, score)), totalBlocked, active, recs);
     }
 
-    // Getters
     public JavaStudioPlugin getPlugin() { return plugin; }
     public CveStats getStats() { return stats; }
     public MotdXssGuardListener getMotdXssGuardListener() { return motdXssGuardListener; }

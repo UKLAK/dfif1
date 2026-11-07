@@ -17,21 +17,15 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * Trình Giám Sát & Bắt Gói Sự Kiện In-Game Trực Tiếp (In-Game Dynamic Event Spy).
- * Cho phép Developer/Admin theo dõi bất kỳ Bukkit Event nào trong game thời gian thực
- * mà không cần viết lại mã nguồn hay khởi động lại server.
- */
 public final class EventSpyManager {
 
     private final JavaStudioPlugin plugin;
     private final Set<UUID> subscribedAdmins = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Map<String, DynamicEventListener> activeSpies = new ConcurrentHashMap<>();
 
-    private volatile String playerFilter = null; // Lọc theo người chơi cụ thể
+    private volatile String playerFilter = null;
     private volatile boolean showCancelledOnly = false;
 
-    // Rate limiter chống flood chat: max 15 event/giây
     private final AtomicInteger eventRateCounter = new AtomicInteger(0);
     private volatile long currentSecond = 0;
 
@@ -46,9 +40,6 @@ public final class EventSpyManager {
         this.plugin = plugin;
     }
 
-    /**
-     * Bắt đầu theo dõi một Event bất kỳ.
-     */
     public boolean startSpy(String eventName, CommandSender notifySender) {
         Class<? extends Event> clazz = resolveEventClass(eventName);
         if (clazz == null) {
@@ -76,7 +67,7 @@ public final class EventSpyManager {
                     EventPriority.MONITOR,
                     executor,
                     plugin,
-                    false // ignoreCancelled = false: bắt cả event đã bị huỷ
+                    false
             );
             activeSpies.put(simpleName, dummyListener);
             MessageUtil.sendSuccess(notifySender, "Đã kích hoạt EventSpy cho: §e§l" + simpleName);
@@ -87,9 +78,6 @@ public final class EventSpyManager {
         }
     }
 
-    /**
-     * Dừng theo dõi một sự kiện cụ thể.
-     */
     public boolean stopSpy(String eventName, CommandSender notifySender) {
         String matchKey = null;
         for (String k : activeSpies.keySet()) {
@@ -114,9 +102,6 @@ public final class EventSpyManager {
         return true;
     }
 
-    /**
-     * Dừng toàn bộ các sự kiện đang theo dõi.
-     */
     public void stopAll(CommandSender notifySender) {
         for (DynamicEventListener listener : activeSpies.values()) {
             HandlerList.unregisterAll(listener);
@@ -128,9 +113,6 @@ public final class EventSpyManager {
         }
     }
 
-    /**
-     * Đăng ký nhận tin nhắn debug EventSpy.
-     */
     public boolean toggleSubscription(Player player) {
         if (player == null) return false;
         UUID uuid = player.getUniqueId();
@@ -154,7 +136,7 @@ public final class EventSpyManager {
             eventRateCounter.set(0);
         }
         if (eventRateCounter.incrementAndGet() > 15) {
-            return; // Chống spam chat
+            return;
         }
 
         String playerStr = extractPlayerName(event);
@@ -204,7 +186,6 @@ public final class EventSpyManager {
 
     private String formatDetails(Event event) {
         StringBuilder sb = new StringBuilder();
-        // Trích xuất Block
         try {
             Method m = event.getClass().getMethod("getBlock");
             Object b = m.invoke(event);
@@ -213,7 +194,6 @@ public final class EventSpyManager {
             }
         } catch (Throwable ignored) {}
 
-        // Trích xuất Item
         try {
             Method m = event.getClass().getMethod("getItem");
             Object item = m.invoke(event);
@@ -222,7 +202,6 @@ public final class EventSpyManager {
             }
         } catch (Throwable ignored) {}
 
-        // Trích xuất Action
         try {
             Method m = event.getClass().getMethod("getAction");
             Object act = m.invoke(event);
@@ -236,13 +215,11 @@ public final class EventSpyManager {
 
     @SuppressWarnings("unchecked")
     private Class<? extends Event> resolveEventClass(String name) {
-        // 1. Thử tên đầy đủ
         try {
             Class<?> c = Class.forName(name);
             if (Event.class.isAssignableFrom(c)) return (Class<? extends Event>) c;
         } catch (Throwable ignored) {}
 
-        // 2. Thử các package thông dụng của Bukkit
         String[] packages = {
                 "org.bukkit.event.player.",
                 "org.bukkit.event.block.",

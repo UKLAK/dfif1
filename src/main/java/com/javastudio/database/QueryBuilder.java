@@ -3,49 +3,6 @@ package com.javastudio.database;
 import java.sql.*;
 import java.util.*;
 
-/**
- * Trình xây dựng câu truy vấn SQL (Fluent Query Builder) cho Dynamic Plugins.
- *
- * <p>Cho phép viết câu SQL ngắn gọn, an toàn (Prepared Statement) và dễ đọc:</p>
- *
- * <pre>{@code
- * // SELECT
- * List<Map<String, Object>> results = QueryBuilder.select("players")
- *     .columns("name", "level", "coins")
- *     .where("level", ">", 10)
- *     .and("coins", ">=", 500)
- *     .orderBy("level", false)
- *     .limit(20)
- *     .execute(connection);
- *
- * // INSERT
- * QueryBuilder.insert("players")
- *     .set("name", "Steve")
- *     .set("level", 1)
- *     .set("coins", 100)
- *     .execute(connection);
- *
- * // UPDATE
- * QueryBuilder.update("players")
- *     .set("coins", 500)
- *     .set("level", 10)
- *     .where("name", "=", "Steve")
- *     .execute(connection);
- *
- * // DELETE
- * QueryBuilder.delete("players")
- *     .where("level", "<", 5)
- *     .execute(connection);
- *
- * // CREATE TABLE (Migration)
- * QueryBuilder.createTable("players")
- *     .column("id", "INTEGER PRIMARY KEY AUTOINCREMENT")
- *     .column("name", "TEXT NOT NULL UNIQUE")
- *     .column("level", "INTEGER DEFAULT 1")
- *     .column("coins", "REAL DEFAULT 0")
- *     .execute(connection);
- * }</pre>
- */
 public class QueryBuilder {
 
     public enum Type { SELECT, INSERT, UPDATE, DELETE, CREATE_TABLE, RAW }
@@ -70,9 +27,6 @@ public class QueryBuilder {
         this.table = table;
     }
 
-    // ========================================
-    // STATIC FACTORY METHODS
-    // ========================================
 
     public static QueryBuilder select(String table) { return new QueryBuilder(Type.SELECT, table); }
     public static QueryBuilder insert(String table) { return new QueryBuilder(Type.INSERT, table); }
@@ -86,18 +40,12 @@ public class QueryBuilder {
         return qb;
     }
 
-    // ========================================
-    // SELECT BUILDERS
-    // ========================================
 
     public QueryBuilder columns(String... cols) {
         selectColumns.addAll(Arrays.asList(cols));
         return this;
     }
 
-    // ========================================
-    // WHERE BUILDERS
-    // ========================================
 
     public QueryBuilder where(String column, String operator, Object value) {
         whereClauses.add(new WhereClause("AND", column, operator, value));
@@ -133,18 +81,12 @@ public class QueryBuilder {
         return this;
     }
 
-    // ========================================
-    // SET BUILDERS (INSERT / UPDATE)
-    // ========================================
 
     public QueryBuilder set(String column, Object value) {
         setValues.put(column, value);
         return this;
     }
 
-    // ========================================
-    // ORDER, LIMIT, OFFSET
-    // ========================================
 
     public QueryBuilder orderBy(String column, boolean ascending) {
         this.orderByColumn = column;
@@ -164,22 +106,13 @@ public class QueryBuilder {
         return this;
     }
 
-    // ========================================
-    // CREATE TABLE BUILDERS
-    // ========================================
 
     public QueryBuilder column(String name, String definition) {
         tableColumns.add(name + " " + definition);
         return this;
     }
 
-    // ========================================
-    // BUILD SQL
-    // ========================================
 
-    /**
-     * Xây dựng câu SQL và danh sách tham số.
-     */
     public PreparedQuery build() {
         return switch (type) {
             case SELECT -> buildSelect();
@@ -266,13 +199,7 @@ public class QueryBuilder {
         return params;
     }
 
-    // ========================================
-    // EXECUTE
-    // ========================================
 
-    /**
-     * Thực thi truy vấn SELECT và trả về danh sách kết quả.
-     */
     public List<Map<String, Object>> execute(Connection conn) throws SQLException {
         PreparedQuery pq = build();
         try (PreparedStatement stmt = conn.prepareStatement(pq.sql())) {
@@ -288,9 +215,6 @@ public class QueryBuilder {
         }
     }
 
-    /**
-     * Thực thi truy vấn UPDATE/INSERT/DELETE và trả về số dòng ảnh hưởng.
-     */
     public int executeUpdate(Connection conn) throws SQLException {
         PreparedQuery pq = build();
         try (PreparedStatement stmt = conn.prepareStatement(pq.sql())) {
@@ -299,18 +223,12 @@ public class QueryBuilder {
         }
     }
 
-    /**
-     * Thực thi SELECT và trả về 1 dòng đầu tiên (hoặc null).
-     */
     public Map<String, Object> executeOne(Connection conn) throws SQLException {
         this.limitCount = 1;
         List<Map<String, Object>> results = execute(conn);
         return results.isEmpty() ? null : results.get(0);
     }
 
-    /**
-     * Thực thi SELECT COUNT(*) và trả về số dòng.
-     */
     public long count(Connection conn) throws SQLException {
         selectColumns.clear();
         selectColumns.add("COUNT(*)");
@@ -352,8 +270,5 @@ public class QueryBuilder {
         return results;
     }
 
-    /**
-     * Record chứa câu SQL đã build và danh sách tham số.
-     */
     public record PreparedQuery(String sql, List<Object> params) {}
 }

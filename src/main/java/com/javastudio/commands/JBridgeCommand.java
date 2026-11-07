@@ -13,9 +13,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Lệnh cầu nối điều hành từ xa & Webhook Discord (/jbridge).
- */
 public class JBridgeCommand implements CommandExecutor, TabCompleter {
 
     private final JavaStudioPlugin plugin;

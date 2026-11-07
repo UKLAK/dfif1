@@ -14,9 +14,6 @@ import org.bukkit.command.TabCompleter;
 import java.io.IOException;
 import java.util.*;
 
-/**
- * Lệnh /jplugin dùng để tạo, biên dịch, nạp và quản lý các Dynamic Plugin.
- */
 public class JPluginCommand implements CommandExecutor, TabCompleter {
 
     private final JavaStudioPlugin plugin;

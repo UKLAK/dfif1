@@ -6,10 +6,6 @@ import org.bukkit.inventory.ItemStack;
 import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
 
-/**
- * Định nghĩa một kỹ năng vật phẩm / vũ khí đặc biệt (Item Ability).
- * Hỗ trợ hồi chiêu tự động (Cooldown), kiểm tra điều kiện và kích hoạt linh hoạt.
- */
 public final class ItemAbility {
 
     private final String id;

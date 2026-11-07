@@ -1,0 +1,19 @@
+name: JavaStudioWeb
+version: '1.0.0'
+main: com.javastudio.web.JavaStudioWebPlugin
+api-version: '1.20'
+author: Antigravity
+description: Plugin mo rong Web Dashboard, Live 3D Radar va Monaco Web IDE cho JavaStudio
+load: POSTWORLD
+folia-supported: true
+softdepend:
+  - JavaStudio
+website: https://papermc.io
+
+commands:
+  jweb:
+    description: Quan ly Web Dashboard, Live Radar va Monaco Web IDE (JavaStudio Extension)
+    usage: /jweb [info|start|stop|restart|reload]
+    aliases: [jsweb, webdashboard]
+    permission: javastudio.admin
+

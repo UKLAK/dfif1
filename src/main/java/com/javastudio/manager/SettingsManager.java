@@ -6,17 +6,10 @@ import org.bukkit.configuration.file.FileConfiguration;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Quản lý cấu hình chi tiết (Settings) và bật/tắt các module của JavaStudio.
- * Cho phép máy chủ tắt những tính năng không cần thiết để giảm tải CPU, RAM, Disk I/O và Network Port.
- */
 public final class SettingsManager {
 
     private final JavaStudioPlugin plugin;
 
-    /**
-     * Định nghĩa các module có thể bật/tắt trong JavaStudio.
-     */
     public enum ModuleKey {
         DIRECT_EXEC("direct-exec", "Thực thi Java trực tiếp (/jexec, /java)", "Trình biên dịch & chạy mã Java tức thì", true),
         DYNAMIC_PLUGINS("dynamic-plugins", "Dynamic Plugins Engine (/jplugin)", "Nạp, quản lý & cách ly dynamic plugin", true),
@@ -51,7 +44,21 @@ public final class SettingsManager {
         FAST_BLOCK("fast-block", "FastBlock & RAM Arena (/jchunk)", "Thao tác khối siêu tốc & nén snapshot đấu trường vào RAM", true),
         DEBUG_HUD("debug-hud", "Debug HUD Thời Gian Thực (/jhud)", "Thanh HUD theo dõi TPS, MSPT, RAM, Ping trên ActionBar/BossBar", true),
         EVENT_SPY("event-spy", "Interactive Event Spy (/jspy)", "Lắng nghe và gỡ lỗi Bukkit Event trực tiếp trong chat", true),
-        TELEMETRY_NEXUS("telemetry-nexus", "Chẩn Đoán Telemetry Nexus (/jdiag)", "Hệ thống chẩn đoán hiệu năng tổng hợp & rò rỉ bộ nhớ", true);
+        TELEMETRY_NEXUS("telemetry-nexus", "Chẩn Đoán Telemetry Nexus (/jdiag)", "Hệ thống chẩn đoán hiệu năng tổng hợp & rò rỉ bộ nhớ", true),
+        CLUSTER_MESH("cluster-mesh", "Cluster Mesh P2P Engine (/jmesh)", "Mạng cụm phân tán P2P & đồng thuận Raft thuần Java", true),
+        DEADLOCK_RESOLVER("deadlock-resolver", "Autonomous Deadlock Resolver", "Phát hiện và tự động giải tỏa bế tắc luồng", true),
+        CHUNK_PREFETCHER("chunk-prefetcher", "Async Chunk Prefetcher (/jprefetch)", "Nạp trước chunk bất đồng bộ theo vector di chuyển", true),
+        GUI_DESIGNER("gui-designer", "Visual In-Game GUI Designer (/jgui)", "Thiết kế menu kéo thả trực quan và sinh mã Java", true),
+        VISUAL_FLOW("visual-flow", "Visual Flow Engine (/jflow)", "Sơ đồ khối logic trực quan và nạp nóng", true),
+        SNAPSHOT_ROLLBACK("snapshot-rollback", "Time-Travel Snapshots & Rollback (/jgit)", "Quản lý phiên bản mã nguồn và hoàn tác", true),
+        MOCK_EVENTS("mock-events", "Mock Event Dispatcher (/jmock)", "Giả lập bắn sự kiện Bukkit in-game", true),
+        DATABASE_QUERY("database-query", "Database Inspector & SQL Query (/jdb)", "Truy vấn và thanh tra SQLite DataStore", true),
+        UNIVERSAL_COMMAND("universal-command", "Universal Command (/js)", "Giao diện dòng lệnh tập trung", true),
+        WEB_IDE("webide", "Monaco Web IDE (:8085)", "Trình soạn thảo mã nguồn VS Code trên nền Web", true),
+        GAS_METER("gas-meter", "Bytecode Gas Metering", "Ngắt vòng lặp vô tận và đệ quy sâu an toàn", true),
+        HOTSWAP_ENGINE("hotswap-engine", "HotSwap Bytecode Patcher", "Vá bytecode phương thức trực tiếp trong RAM", true),
+        INVENTORY_SYNC("inventory-sync", "Đồng Bộ Kho Đồ Cụm (/jmesh sync)", "Đồng bộ túi đồ, giáp, rương không dupe đồ giữa các cụm server", true),
+        SERVER_BENCHMARK("server-benchmark", "Kiểm Thử Sức Mạnh Phần Cứng (/jbench)", "Đo lường năng lực phần cứng, CPU, RAM, NVMe và chấm điểm server", true);
 
         private final String key;
         private final String displayName;
@@ -84,8 +91,13 @@ public final class SettingsManager {
         public static ModuleKey fromKey(String text) {
             if (text == null) return null;
             String clean = text.trim().toLowerCase().replace("_", "-");
+            if (clean.equals("ai-copilot") || clean.equals("copilot")) return AI_ASSISTANT;
+            if (clean.equals("exploitguard") || clean.equals("exploit-guard")) return EXPLOIT_FIXER;
+            String noHyphen = clean.replace("-", "");
             for (ModuleKey m : values()) {
-                if (m.key.equalsIgnoreCase(clean) || m.name().equalsIgnoreCase(clean.replace("-", "_"))) {
+                if (m.key.equalsIgnoreCase(clean)
+                        || m.name().equalsIgnoreCase(clean.replace("-", "_"))
+                        || m.key.replace("-", "").equalsIgnoreCase(noHyphen)) {
                     return m;
                 }
             }
@@ -100,9 +112,6 @@ public final class SettingsManager {
         loadSettings();
     }
 
-    /**
-     * Nạp lại cấu hình các module từ config.yml.
-     */
     public final synchronized void loadSettings() {
         FileConfiguration config = plugin.getConfig();
         moduleStates.clear();
@@ -110,7 +119,6 @@ public final class SettingsManager {
         for (ModuleKey mod : ModuleKey.values()) {
             boolean enabled = config.getBoolean("modules." + mod.getKey(), mod.isDefaultEnabled());
 
-            // Tương thích ngược với các khóa cấu hình cũ
             if (mod == ModuleKey.AUTO_MITIGATION && config.contains("auto-mitigation.enabled")) {
                 enabled = config.getBoolean("auto-mitigation.enabled", false);
             } else if (mod == ModuleKey.FILE_WATCHER && config.contains("watcher.enabled")) {
@@ -154,9 +162,6 @@ public final class SettingsManager {
         }
     }
 
-    /**
-     * Kiểm tra trạng thái của một module cụ thể.
-     */
     public boolean isEnabled(ModuleKey module) {
         return moduleStates.getOrDefault(module, module.isDefaultEnabled());
     }
@@ -166,7 +171,6 @@ public final class SettingsManager {
         return mod == null || isEnabled(mod);
     }
 
-    // Các hàm kiểm tra nhanh từng module
     public boolean isDirectExecEnabled() { return isEnabled(ModuleKey.DIRECT_EXEC); }
     public boolean isDynamicPluginsEnabled() { return isEnabled(ModuleKey.DYNAMIC_PLUGINS); }
     public boolean isScriptManagerEnabled() { return isEnabled(ModuleKey.SCRIPT_MANAGER); }
@@ -183,11 +187,11 @@ public final class SettingsManager {
     public boolean isInteractiveReplEnabled() { return isEnabled(ModuleKey.INTERACTIVE_REPL); }
     public boolean isNetworkSyncEnabled() { return isEnabled(ModuleKey.NETWORK_SYNC); }
     public boolean isExploitFixerEnabled() { return isEnabled(ModuleKey.EXPLOIT_FIXER); }
+    public boolean isExploitGuardEnabled() { return isEnabled(ModuleKey.EXPLOIT_FIXER); }
     public boolean isAntiCheatEnabled() { return isEnabled(ModuleKey.ANTI_CHEAT); }
     public boolean isPanelCveDefenseEnabled() { return isEnabled(ModuleKey.PANEL_CVE_DEFENSE); }
     public boolean isAutoMitigationEnabled() { return isEnabled(ModuleKey.AUTO_MITIGATION); }
 
-    // v3.0 New Module Getters
     public boolean isAiAssistantEnabled() { return isEnabled(ModuleKey.AI_ASSISTANT); }
     public boolean isPacketSnifferEnabled() { return isEnabled(ModuleKey.PACKET_SNIFFER); }
     public boolean isResourcePackEnabled() { return isEnabled(ModuleKey.RESOURCE_PACK); }
@@ -201,16 +205,26 @@ public final class SettingsManager {
     public boolean isDebugHudEnabled() { return isEnabled(ModuleKey.DEBUG_HUD); }
     public boolean isEventSpyEnabled() { return isEnabled(ModuleKey.EVENT_SPY); }
     public boolean isTelemetryNexusEnabled() { return isEnabled(ModuleKey.TELEMETRY_NEXUS); }
+    public boolean isClusterMeshEnabled() { return isEnabled(ModuleKey.CLUSTER_MESH); }
+    public boolean isDeadlockResolverEnabled() { return isEnabled(ModuleKey.DEADLOCK_RESOLVER); }
+    public boolean isChunkPrefetcherEnabled() { return isEnabled(ModuleKey.CHUNK_PREFETCHER); }
+    public boolean isGuiDesignerEnabled() { return isEnabled(ModuleKey.GUI_DESIGNER); }
+    public boolean isVisualFlowEnabled() { return isEnabled(ModuleKey.VISUAL_FLOW); }
+    public boolean isSnapshotRollbackEnabled() { return isEnabled(ModuleKey.SNAPSHOT_ROLLBACK); }
+    public boolean isMockEventsEnabled() { return isEnabled(ModuleKey.MOCK_EVENTS); }
+    public boolean isDatabaseQueryEnabled() { return isEnabled(ModuleKey.DATABASE_QUERY); }
+    public boolean isUniversalCommandEnabled() { return isEnabled(ModuleKey.UNIVERSAL_COMMAND); }
+    public boolean isWebIdeEnabled() { return isEnabled(ModuleKey.WEB_IDE); }
+    public boolean isGasMeterEnabled() { return isEnabled(ModuleKey.GAS_METER); }
+    public boolean isHotSwapEngineEnabled() { return isEnabled(ModuleKey.HOTSWAP_ENGINE); }
+    public boolean isInventorySyncEnabled() { return isEnabled(ModuleKey.INVENTORY_SYNC); }
+    public boolean isServerBenchmarkEnabled() { return isEnabled(ModuleKey.SERVER_BENCHMARK); }
 
-    /**
-     * Bật hoặc tắt một module và lập tức áp dụng thay đổi (start/stop background tasks/threads).
-     */
     public synchronized boolean setModuleEnabled(ModuleKey module, boolean enable) {
         moduleStates.put(module, enable);
         FileConfiguration config = plugin.getConfig();
         config.set("modules." + module.getKey(), enable);
 
-        // Đồng bộ với các mục tương thích ngược và kích hoạt / hủy kích hoạt tài nguyên
         if (module == ModuleKey.AUTO_MITIGATION) {
             config.set("auto-mitigation.enabled", enable);
             if (plugin.getAutoMitigationEngine() != null) {
@@ -224,7 +238,6 @@ public final class SettingsManager {
                 plugin.getFileWatcher().stop();
             }
         } else if (module == ModuleKey.DYNAMIC_PLUGINS && !enable) {
-            // Khi tắt dynamic plugins, dừng toàn bộ dynamic plugin đang chạy
             plugin.getPluginManager().unloadAll();
         } else if (module == ModuleKey.DISPLAY_ENGINE && !enable) {
             if (plugin.getDisplayEngine() != null) {
@@ -276,30 +289,59 @@ public final class SettingsManager {
             } else if (enable && plugin.getPanelCveProtection() != null) {
                 plugin.getPanelCveProtection().init();
             }
+        } else if (module == ModuleKey.CLUSTER_MESH) {
+            if (!enable && plugin.getClusterMeshEngine() != null) {
+                plugin.getClusterMeshEngine().stop();
+            } else if (enable && plugin.getClusterMeshEngine() != null) {
+                plugin.getClusterMeshEngine().start();
+            }
+        } else if (module == ModuleKey.DEADLOCK_RESOLVER) {
+            if (!enable && plugin.getDeadlockResolverEngine() != null) {
+                plugin.getDeadlockResolverEngine().stop();
+            } else if (enable && plugin.getDeadlockResolverEngine() != null) {
+                plugin.getDeadlockResolverEngine().start();
+            }
+        } else if (module == ModuleKey.CHUNK_PREFETCHER) {
+            if (!enable && plugin.getChunkPrefetcher() != null) {
+                plugin.getChunkPrefetcher().stop();
+            } else if (enable && plugin.getChunkPrefetcher() != null) {
+                plugin.getChunkPrefetcher().start();
+            }
+        } else if (module == ModuleKey.RESOURCE_PACK) {
+            config.set("resource-pack.enabled", enable);
+            if (!enable && plugin.getResourcePackHost() != null) {
+                plugin.getResourcePackHost().stop();
+            } else if (enable && plugin.getResourcePackHost() != null) {
+                plugin.getResourcePackHost().start();
+            }
+        } else if (module == ModuleKey.GAS_METER) {
+            com.javastudio.security.LoopWatchdog.setEnabled(enable);
+            com.javastudio.pipeline.LoopGuardTransformer.setEnabled(enable);
+        } else if (module == ModuleKey.WEB_IDE) {
+            if (plugin.getAntiCheatManager() != null && plugin.getAntiCheatManager().getWebDashboard() != null) {
+                try {
+                    if (!enable) {
+                        plugin.getAntiCheatManager().getWebDashboard().stop();
+                    } else {
+                        plugin.getAntiCheatManager().getWebDashboard().start();
+                    }
+                } catch (Throwable ignored) {}
+            }
         }
 
         plugin.saveConfig();
         return enable;
     }
 
-    /**
-     * Đảo trạng thái (toggle) một module.
-     */
     public synchronized boolean toggleModule(ModuleKey module) {
         boolean current = isEnabled(module);
         return setModuleEnabled(module, !current);
     }
 
-    /**
-     * Lấy toàn bộ danh sách module cùng trạng thái hiện tại.
-     */
     public Map<ModuleKey, Boolean> getAllModules() {
         return Collections.unmodifiableMap(moduleStates);
     }
 
-    /**
-     * Lấy giải thích tối ưu hóa phần cứng khi tắt module.
-     */
     public String getResourceSavings(ModuleKey module) {
         return switch (module) {
             case AUTO_MITIGATION -> "Tắt giám sát quá tải tự động; không hạ tầm nhìn thế giới hay dọn thực thể khi lag.";
@@ -336,6 +378,20 @@ public final class SettingsManager {
             case DEBUG_HUD -> "Dừng tác vụ cập nhật định kỳ trên ActionBar và BossBar của người chơi.";
             case EVENT_SPY -> "Hủy toàn bộ Listener lắng nghe sự kiện Bukkit đang gỡ lỗi trong game.";
             case TELEMETRY_NEXUS -> "Dừng tác vụ lấy mẫu thống kê TPS, MSPT, rò rỉ bộ nhớ Metaspace định kỳ.";
+            case CLUSTER_MESH -> "Đóng toàn bộ cổng UDP multicast và socket TCP peer-to-peer trong mạng cục bộ.";
+            case DEADLOCK_RESOLVER -> "Dừng tác vụ quét chu trình khóa ThreadMXBean định kỳ trên JVM.";
+            case CHUNK_PREFETCHER -> "Dừng theo dõi vector vận tốc người chơi và không gọi async chunk loading.";
+            case GUI_DESIGNER -> "Tắt trình thiết kế menu rương và hủy sự kiện click kéo thả in-game.";
+            case VISUAL_FLOW -> "Không nạp hoặc biên dịch các kịch bản sơ đồ khối logic từ thư mục flows/.";
+            case SNAPSHOT_ROLLBACK -> "Không tự động tạo bản sao lưu snapshot mã nguồn.";
+            case MOCK_EVENTS -> "Vô hiệu hóa bộ tạo và bắn sự kiện Bukkit giả lập.";
+            case DATABASE_QUERY -> "Khóa tính năng thực thi câu lệnh SQL trực tiếp trên database của plugin.";
+            case UNIVERSAL_COMMAND -> "Vô hiệu hóa lệnh gom tập trung /js.";
+            case WEB_IDE -> "Đóng máy chủ HTTP cổng 8085, không phục vụ trình soạn thảo Web Monaco.";
+            case GAS_METER -> "Bỏ qua bước tiêm lệnh đếm nhịp gas vào mã nguồn khi biên dịch.";
+            case HOTSWAP_ENGINE -> "Tắt cơ chế vá bytecode nóng trong RAM qua JVM Instrumentation.";
+            case INVENTORY_SYNC -> "Không đồng bộ kho đồ người chơi qua mạng P2P, chỉ lưu cục bộ trên máy chủ.";
+            case SERVER_BENCHMARK -> "Không chạy các bài đo lường năng lực phần cứng và stress test máy chủ.";
         };
     }
 }

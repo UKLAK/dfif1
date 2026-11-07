@@ -9,15 +9,6 @@ import org.bukkit.entity.Player;
 import java.lang.reflect.Method;
 import java.util.*;
 
-/**
- * Kho vũ khí cầu nối sinh thái (Universal Ecosystem Bridge Arsenal).
- * Tự động liên kết an toàn qua reflection với các plugin server hàng đầu:
- * - WorldGuard / GriefPrevention (bảo vệ lãnh thổ, kiểm tra quyền build, pvp)
- * - DecentHolograms / HolographicDisplays (hiển thị chữ nổi 3D, thông báo tương tác)
- * - Citizens (quản lý, tạo và tương tác NPC)
- * - LuckPerms (truy vấn rank, prefix, suffix, nhóm quyền chính)
- * Đảm bảo 100% không bị lỗi NoClassDefFoundError nếu máy chủ không cài đặt các plugin này.
- */
 public class EcosystemBridge {
 
     private static final WorldGuardHook worldGuard = new WorldGuardHook();
@@ -38,9 +29,6 @@ public class EcosystemBridge {
     public static MythicMobsHook getMythicMobs() { return mythicMobs; }
     public static ModelEngineHook getModelEngine() { return modelEngine; }
 
-    // ==========================================================
-    // 1. CẦU NỐI WORLDGUARD (Region & Flags Protection)
-    // ==========================================================
     public static class WorldGuardHook {
         private Boolean available = null;
 
@@ -54,7 +42,6 @@ public class EcosystemBridge {
         public boolean canBuild(Player player, Location loc) {
             if (!isAvailable() || player == null || loc == null) return true;
             try {
-                // WorldGuard 7+ API: WorldGuard.getInstance().getPlatform().getRegionContainer().createQuery()
                 Class<?> wgClass = Class.forName("com.sk89q.worldguard.WorldGuard");
                 Object wgInstance = wgClass.getMethod("getInstance").invoke(null);
                 Object platform = wgClass.getMethod("getPlatform").invoke(wgInstance);
@@ -145,9 +132,6 @@ public class EcosystemBridge {
         }
     }
 
-    // ==========================================================
-    // 2. CẦU NỐI CHỮ NỔI 3D (DecentHolograms Hook)
-    // ==========================================================
     public static class HologramHook {
         private Boolean available = null;
 
@@ -202,9 +186,6 @@ public class EcosystemBridge {
         }
     }
 
-    // ==========================================================
-    // 3. CẦU NỐI CITIZENS (NPC Manager Hook)
-    // ==========================================================
     public static class CitizensHook {
         private Boolean available = null;
 
@@ -245,9 +226,6 @@ public class EcosystemBridge {
         }
     }
 
-    // ==========================================================
-    // 4. CẦU NỐI LUCKPMS (Rank, Prefix & Groups Hook)
-    // ==========================================================
     public static class LuckPermsHook {
         private Boolean available = null;
         private Object luckPermsInstance = null;
@@ -323,9 +301,6 @@ public class EcosystemBridge {
         }
     }
 
-    // ==========================================================
-    // 5. CẦU NỐI ITEMSADDER (Custom 3D Items, Blocks & Furniture)
-    // ==========================================================
     public static class ItemsAdderHook {
         private Boolean available = null;
 
@@ -360,9 +335,6 @@ public class EcosystemBridge {
         }
     }
 
-    // ==========================================================
-    // 6. CẦU NỐI ORAXEN (Custom Items, Glyph & Mechanics)
-    // ==========================================================
     public static class OraxenHook {
         private Boolean available = null;
 
@@ -397,9 +369,6 @@ public class EcosystemBridge {
         }
     }
 
-    // ==========================================================
-    // 7. CẦU NỐI MYTHICMOBS (Custom Mobs, Bosses & Skills)
-    // ==========================================================
     public static class MythicMobsHook {
         private Boolean available = null;
 
@@ -440,9 +409,6 @@ public class EcosystemBridge {
         }
     }
 
-    // ==========================================================
-    // 8. CẦU NỐI MODELENGINE (3D Custom Bedrock Entity Models)
-    // ==========================================================
     public static class ModelEngineHook {
         private Boolean available = null;
 

@@ -10,10 +10,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
-/**
- * Dịch vụ theo dõi file (Hot-Reload File Watcher) tự động phát hiện thay đổi
- * khi lập trình viên nhấn Ctrl + S trong VS Code / IntelliJ và tự động nạp lại plugin/script.
- */
 public class FileWatcherService {
 
     private final JavaStudioPlugin plugin;
@@ -24,7 +20,7 @@ public class FileWatcherService {
 
     private final Map<WatchKey, Path> keyPathMap = new ConcurrentHashMap<>();
     private final Map<String, Long> debounceMap = new ConcurrentHashMap<>();
-    private static final long DEBOUNCE_MS = 600; // Tránh nạp lặp nhiều lần khi IDE đang ghi file
+    private static final long DEBOUNCE_MS = 600;
 
     public FileWatcherService(JavaStudioPlugin plugin) {
         this.plugin = plugin;
@@ -43,7 +39,6 @@ public class FileWatcherService {
             this.watchService = FileSystems.getDefault().newWatchService();
             this.keyPathMap.clear();
 
-            // Đăng ký theo dõi thư mục projects và scripts
             File projectsDir = plugin.getPluginManager().getProjectsFolder();
             File scriptsDir = plugin.getScriptManager().getScriptsFolder();
 
@@ -116,14 +111,12 @@ public class FileWatcherService {
                 Path filename = ev.context();
                 Path child = dir.resolve(filename);
 
-                // Nếu tạo thư mục mới, đăng ký luôn vào watcher
                 if (kind == StandardWatchEventKinds.ENTRY_CREATE && Files.isDirectory(child)) {
                     try {
                         registerAll(child);
                     } catch (IOException ignored) {}
                 }
 
-                // Nếu là file .java thay đổi
                 if (filename.toString().endsWith(".java")) {
                     handleFileChange(child);
                 }
@@ -141,7 +134,6 @@ public class FileWatcherService {
         Path scriptsPath = plugin.getScriptManager().getScriptsFolder().toPath();
 
         if (file.startsWith(projectsPath)) {
-            // Xác định project name
             Path relative = projectsPath.relativize(file);
             if (relative.getNameCount() >= 1) {
                 String projectName = relative.getName(0).toString();
@@ -162,7 +154,6 @@ public class FileWatcherService {
         }
         debounceMap.put(targetName, now);
 
-        // Chạy trên Main Thread của Bukkit
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             if (!isScript) {
                 if (plugin.getPluginManager().isLoaded(targetName)) {
@@ -181,7 +172,7 @@ public class FileWatcherService {
             } else {
                 plugin.getLogger().info("[Hot-Reload] Đã phát hiện thay đổi trong script: " + targetName + ".java");
             }
-        }, 5L); // Trì hoãn 5 ticks (0.25s) để đảm bảo file đã được lưu hoàn tất
+        }, 5L);
     }
 
     public boolean isRunning() {

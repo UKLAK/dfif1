@@ -8,9 +8,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * File Manager định tuyến bytecode được sinh ra bởi JavaCompiler lưu thẳng vào Map bộ nhớ.
- */
 public class ClassFileManager extends ForwardingJavaFileManager<JavaFileManager> {
 
     private final Map<String, MemoryJavaFileObject> outputFiles = new HashMap<>();
@@ -26,9 +23,6 @@ public class ClassFileManager extends ForwardingJavaFileManager<JavaFileManager>
         return fileObject;
     }
 
-    /**
-     * Lấy toàn bộ bytecode của các class đã được biên dịch (Class Name -> Byte array)
-     */
     public Map<String, byte[]> getAllByteCodes() {
         Map<String, byte[]> result = new HashMap<>();
         for (Map.Entry<String, MemoryJavaFileObject> entry : outputFiles.entrySet()) {

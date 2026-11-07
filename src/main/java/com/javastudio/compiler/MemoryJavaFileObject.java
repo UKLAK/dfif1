@@ -5,25 +5,16 @@ import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.net.URI;
 
-/**
- * Đối tượng lưu trữ mã nguồn Java hoặc Bytecode trực tiếp trong bộ nhớ RAM.
- */
 public class MemoryJavaFileObject extends SimpleJavaFileObject {
 
     private final String sourceCode;
     private ByteArrayOutputStream byteCodeStream;
 
-    /**
-     * Dùng cho mã nguồn đầu vào (Source code input)
-     */
     public MemoryJavaFileObject(String className, String sourceCode) {
         super(URI.create("string:///" + className.replace('.', '/') + Kind.SOURCE.extension), Kind.SOURCE);
         this.sourceCode = sourceCode;
     }
 
-    /**
-     * Dùng cho Bytecode đầu ra (Bytecode output)
-     */
     public MemoryJavaFileObject(String name, Kind kind) {
         super(URI.create("mem:///" + name.replace('.', '/') + kind.extension), kind);
         this.sourceCode = null;

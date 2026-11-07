@@ -10,10 +10,6 @@ import org.bukkit.entity.Player;
 import java.lang.reflect.Method;
 import java.util.*;
 
-/**
- * BrigadierCommandEngine: Đồng bộ cây lệnh Mojang Brigadier cấp thấp trực tiếp vào NMS/Paper.
- * Cho phép các Dynamic Plugin cập nhật cú pháp, tham số gợi ý và tô màu lệnh trên khung Chat tức thì (<0.1s).
- */
 public class BrigadierCommandEngine {
 
     private final JavaStudioPlugin plugin;
@@ -50,9 +46,6 @@ public class BrigadierCommandEngine {
         } catch (Throwable ignored) {}
     }
 
-    /**
-     * Tiêm một lệnh động vào cây Brigadier CommandDispatcher.
-     */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public boolean injectBrigadierCommand(String commandName, List<String> aliases, String description) {
         if (nmsDispatcher == null) {
@@ -76,17 +69,12 @@ public class BrigadierCommandEngine {
         return false;
     }
 
-    /**
-     * Đồng bộ lại cây lệnh toàn diện tới toàn bộ người chơi đang online qua player.updateCommands().
-     */
     public void syncAllPlayers() {
-        // 1. Đồng bộ server-level
         try {
             Method m = Bukkit.getServer().getClass().getMethod("syncCommands");
             m.invoke(Bukkit.getServer());
         } catch (Throwable ignored) {}
 
-        // 2. Ép gửi gói tin làm mới cây lệnh (PacketPlayOutCommands) tới từng Client
         for (Player p : Bukkit.getOnlinePlayers()) {
             try {
                 p.updateCommands();

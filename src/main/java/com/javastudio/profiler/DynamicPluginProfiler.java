@@ -9,11 +9,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Trình đo lường hiệu năng và cảnh báo Lag Spike của Dynamic Plugins (Plugin Profiler).
- * Theo dõi thời gian thực thi (nanosecond / microsecond) của từng Event Handler và Task,
- * cảnh báo tức thì khi có hàm làm tụt TPS server (>10ms).
- */
 public class DynamicPluginProfiler {
 
     private final JavaStudioPlugin plugin;
@@ -58,9 +53,6 @@ public class DynamicPluginProfiler {
         metrics.remove(pluginName.toLowerCase());
     }
 
-    /**
-     * Ghi nhận một lần thực thi Event hoặc Task.
-     */
     public void record(String pluginName, String actionName, long elapsedNanos) {
         String key = pluginName.toLowerCase();
         if (!isProfiling(key)) return;
@@ -71,12 +63,9 @@ public class DynamicPluginProfiler {
         m.calls.incrementAndGet();
         m.totalNanos.addAndGet(elapsedNanos);
 
-        // Cập nhật max
         m.maxNanos.accumulateAndGet(elapsedNanos, Math::max);
-        // Cập nhật min
         m.minNanos.accumulateAndGet(elapsedNanos, Math::min);
 
-        // Phát hiện Lag Spike (> 10ms = 10,000,000 ns trên Main Thread)
         if (elapsedNanos > 10_000_000) {
             m.lagSpikes.incrementAndGet();
             double ms = elapsedNanos / 1_000_000.0;
@@ -124,34 +113,57 @@ public class DynamicPluginProfiler {
     }
 
     public String toFlameGraphJson() {
-        StringBuilder sb = new StringBuilder();
+        Map<String, Map<String, long[]>> merged = new LinkedHashMap<>();
+
+        for (Map.Entry<String, Map<String, EventMetric>> entry : metrics.entrySet()) {
+            Map<String, long[]> actions = merged.computeIfAbsent(entry.getKey(), k -> new LinkedHashMap<>());
+            for (Map.Entry<String, EventMetric> ae : entry.getValue().entrySet()) {
+                EventMetric em = ae.getValue();
+                actions.put(ae.getKey(), new long[]{em.totalNanos.get(), em.calls.get(), em.lagSpikes.get(), em.maxNanos.get()});
+            }
+        }
+
+        if (plugin.getCircuitBreakerEngine() != null) {
+            for (var node : plugin.getCircuitBreakerEngine().getAllBreakers()) {
+                long nanos = node.totalTimeNano.get();
+                long calls = node.totalCalls.get();
+                if (calls <= 0) continue;
+                Map<String, long[]> actions = merged.computeIfAbsent(node.pluginName, k -> new LinkedHashMap<>());
+                String label = node.listenerClass + " [" + node.priority + "]";
+                actions.putIfAbsent(label, new long[]{nanos, calls, node.totalErrors.get(), node.maxTimeNano.get()});
+            }
+        }
+
         long totalServerNanos = 0;
-        for (Map<String, EventMetric> pMap : metrics.values()) {
-            for (EventMetric em : pMap.values()) {
-                totalServerNanos += em.totalNanos.get();
+        for (Map<String, long[]> pMap : merged.values()) {
+            for (long[] stat : pMap.values()) {
+                totalServerNanos += stat[0];
             }
         }
         if (totalServerNanos <= 0) totalServerNanos = 1000;
 
+        StringBuilder sb = new StringBuilder();
         sb.append("{\"name\":\"Server Root\",\"value\":").append(totalServerNanos).append(",\"children\":[");
         int pIndex = 0;
-        for (Map.Entry<String, Map<String, EventMetric>> entry : metrics.entrySet()) {
-            String pName = entry.getKey();
-            Map<String, EventMetric> actionMap = entry.getValue();
+        for (Map.Entry<String, Map<String, long[]>> entry : merged.entrySet()) {
+            String pName = entry.getKey().replace("\\", "\\\\").replace("\"", "\\\"");
+            Map<String, long[]> actionMap = entry.getValue();
             long pTotal = 0;
-            for (EventMetric em : actionMap.values()) {
-                pTotal += em.totalNanos.get();
+            for (long[] stat : actionMap.values()) {
+                pTotal += stat[0];
             }
             if (pIndex > 0) sb.append(",");
             sb.append("{\"name\":\"").append(pName).append("\",\"value\":").append(pTotal).append(",\"children\":[");
             int aIndex = 0;
-            for (Map.Entry<String, EventMetric> aEntry : actionMap.entrySet()) {
-                String aName = aEntry.getKey().replace("\"", "\\\"");
-                EventMetric em = aEntry.getValue();
+            for (Map.Entry<String, long[]> aEntry : actionMap.entrySet()) {
+                String aName = aEntry.getKey().replace("\\", "\\\\").replace("\"", "\\\"");
+                long[] stat = aEntry.getValue();
                 if (aIndex > 0) sb.append(",");
-                sb.append("{\"name\":\"").append(aName).append("\",\"value\":").append(em.totalNanos.get())
-                  .append(",\"calls\":").append(em.calls.get())
-                  .append(",\"lagSpikes\":").append(em.lagSpikes.get()).append("}");
+                sb.append("{\"name\":\"").append(aName).append("\",\"value\":").append(stat[0])
+                        .append(",\"calls\":").append(stat[1])
+                        .append(",\"lagSpikes\":").append(stat[2])
+                        .append(",\"maxMs\":").append(String.format(Locale.US, "%.3f", stat[3] / 1_000_000.0))
+                        .append("}");
                 aIndex++;
             }
             sb.append("]}");

@@ -23,10 +23,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
-/**
- * FakePlayerManager: Hệ thống giả lập người chơi (Bot Simulation) & Stress-Test máy chủ.
- * Cho phép tạo hàng loạt Bot thực thi tác vụ PvP, di chuyển, spam GUI và nạp Chunk để đo lường TPS/MSPT.
- */
 @SuppressWarnings("deprecation")
 public class FakePlayerManager {
 
@@ -40,9 +36,6 @@ public class FakePlayerManager {
         this.plugin = plugin;
     }
 
-    /**
-     * Triệu hồi 1 Bot tại tọa độ chỉ định.
-     */
     public SimulatedBot spawnBot(String name, Location location) {
         if (activeBots.containsKey(name.toLowerCase())) {
             removeBot(name);
@@ -51,7 +44,6 @@ public class FakePlayerManager {
         World world = location.getWorld();
         if (world == null) return null;
 
-        // Tạo LivingEntity mô phỏng người chơi (ArmorStand trang bị đầy đủ vật phẩm)
         ArmorStand stand = world.spawn(location, ArmorStand.class, as -> {
             as.setCustomName("§b[BOT] §f" + name);
             as.setCustomNameVisible(true);
@@ -70,9 +62,6 @@ public class FakePlayerManager {
         return bot;
     }
 
-    /**
-     * Triệu hồi nhiều Bot cùng lúc xung quanh vị trí chỉ định.
-     */
     public List<SimulatedBot> spawnBots(String baseName, int count, Location location) {
         List<SimulatedBot> list = new ArrayList<>();
         double radius = Math.max(2.0, Math.sqrt(count));
@@ -90,9 +79,6 @@ public class FakePlayerManager {
         return list;
     }
 
-    /**
-     * Thực thi một hành động trên Bot hoặc toàn bộ Bot ("all").
-     */
     public int executeAction(String botTarget, String action, String[] extraArgs, CommandSender feedbackSender) {
         List<SimulatedBot> targets = new ArrayList<>();
         if ("all".equalsIgnoreCase(botTarget)) {
@@ -115,7 +101,6 @@ public class FakePlayerManager {
 
             switch (action.toLowerCase()) {
                 case "attack" -> {
-                    // Quét các entity xung quanh trong bán kính 3.5 block
                     List<Entity> nearby = bot.entity().getNearbyEntities(3.5, 3.5, 3.5);
                     Entity victim = null;
                     for (Entity e : nearby) {
@@ -127,7 +112,6 @@ public class FakePlayerManager {
                     if (victim instanceof LivingEntity le) {
                         le.damage(4.0, bot.entity());
                     }
-                    // Hiệu ứng vung kiếm
                     bot.entity().setVelocity(bot.entity().getLocation().getDirection().multiply(0.2));
                     count++;
                 }
@@ -151,7 +135,6 @@ public class FakePlayerManager {
                             slot = Integer.parseInt(extraArgs[0]);
                         } catch (NumberFormatException ignored) {}
                     }
-                    // Kích hoạt sự kiện click GUI để test độ chịu tải của /jgui
                     Player dummyPlayer = Bukkit.getOnlinePlayers().stream().findFirst().orElse(null);
                     if (dummyPlayer != null) {
                         Inventory topInv = dummyPlayer.getOpenInventory().getTopInventory();
@@ -187,9 +170,6 @@ public class FakePlayerManager {
         return count;
     }
 
-    /**
-     * Khởi chạy Stress-Test tự động: Sinh hàng loạt bot, phân tán tải nạp Chunk và đo lường sụt giảm TPS/MSPT.
-     */
     public boolean startStressTest(CommandSender sender, int botCount, int durationSeconds, Location center) {
         if (stressTestTask != null) {
             MessageUtil.sendError(sender, "Một bài kiểm thử Stress-Test đang chạy dở! Hãy đợi kết thúc.");
@@ -204,7 +184,6 @@ public class FakePlayerManager {
                 center.getBlockX() + ", " + center.getBlockY() + ", " + center.getBlockZ());
         MessageUtil.sendRaw(sender, "  &aĐang sinh " + botCount + " Bot giả lập và bắt đầu phân tán tải Chunks...");
 
-        // Xóa bot cũ thuộc prefix stress
         activeBots.keySet().removeIf(k -> k.startsWith("stress_"));
 
         List<SimulatedBot> bots = spawnBots("stress", botCount, center);
@@ -221,7 +200,6 @@ public class FakePlayerManager {
         stressTestTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             elapsed[0]++;
 
-            // Cho các bot di chuyển tỏa ra xa để kích thích nạp Chunk
             for (SimulatedBot bot : bots) {
                 if (bot.entity() != null && bot.entity().isValid()) {
                     double angle = ThreadLocalRandom.current().nextDouble() * 2 * Math.PI;
@@ -244,7 +222,6 @@ public class FakePlayerManager {
                     stressTestTask = null;
                 }
 
-                // Dọn dẹp bot
                 for (SimulatedBot b : bots) {
                     removeBot(b.name());
                 }

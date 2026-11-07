@@ -12,9 +12,6 @@ import org.bukkit.command.TabCompleter;
 import java.io.File;
 import java.util.*;
 
-/**
- * Lệnh điều khiển mạng đa máy chủ và đồng bộ Redis (/jnetwork hoặc /jnet).
- */
 public class JNetworkCommand implements CommandExecutor, TabCompleter {
 
     private final JavaStudioPlugin plugin;
@@ -27,6 +24,12 @@ public class JNetworkCommand implements CommandExecutor, TabCompleter {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("javastudio.admin") && !sender.isOp()) {
             MessageUtil.sendError(sender, "Bạn không có quyền quản lý mạng máy chủ!");
+            return true;
+        }
+
+        if (!plugin.getSettingsManager().isNetworkSyncEnabled()) {
+            MessageUtil.sendError(sender, "Tính năng Mạng Đồng Bộ Đa Máy Chủ (/jnetwork) đang bị tắt trong cài đặt!");
+            MessageUtil.sendInfo(sender, "Bật lại bằng lệnh: &e/javastudio toggle network-sync &7hoặc qua &e/javastudio settings");
             return true;
         }
 

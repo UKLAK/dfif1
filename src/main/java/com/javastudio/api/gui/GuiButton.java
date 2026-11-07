@@ -7,9 +7,6 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.function.BiConsumer;
 
-/**
- * Nút bấm tương tác trên SmartGui (Menu rương).
- */
 public class GuiButton {
 
     private final ItemStack item;

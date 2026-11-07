@@ -18,11 +18,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
-/**
- * PacketSnifferManager: Trình bắt, lọc và giải mã các gói tin Netty (ChannelPipeline)
- * Chạy trực tiếp ở tầng thấp bằng Safe Dynamic Proxy & Reflection, hoàn toàn không phụ thuộc ProtocolLib.
- * Cho phép theo dõi gói tin thời gian thực và tạo các hiệu ứng ảo giả lập (Client-side Fake Blocks/Entities).
- */
 public class PacketSnifferManager implements Listener {
 
     private final JavaStudioPlugin plugin;
@@ -95,7 +90,6 @@ public class PacketSnifferManager implements Listener {
             Object pipeline = channel.getClass().getMethod("pipeline").invoke(channel);
             if (pipeline == null) return;
 
-            // Gỡ handler cũ nếu có
             try {
                 Method getMethod = pipeline.getClass().getMethod("get", String.class);
                 if (getMethod.invoke(pipeline, HANDLER_NAME) != null) {
@@ -153,7 +147,6 @@ public class PacketSnifferManager implements Listener {
                     return fireException.invoke(ctx, cause);
                 }
 
-                // Chuyển tiếp các sự kiện pipeline khác
                 if (args != null && args.length > 0) {
                     Object ctx = args[0];
                     try {
@@ -171,7 +164,6 @@ public class PacketSnifferManager implements Listener {
                 return null;
             });
 
-            // Chèn trước packet_handler chính của Minecraft
             boolean added = false;
             try {
                 Method getMethod = pipeline.getClass().getMethod("get", String.class);
@@ -189,7 +181,6 @@ public class PacketSnifferManager implements Listener {
 
             hookedChannels.put(player.getUniqueId(), channel);
         } catch (Throwable ignored) {
-            // Không làm ngắt kết nối người chơi nếu có lỗi pipeline
         }
     }
 
@@ -252,9 +243,6 @@ public class PacketSnifferManager implements Listener {
         }
     }
 
-    /**
-     * Gửi khối ảo (Client-side Fake Block) chỉ hiển thị cho 1 người chơi mà không thay đổi bản đồ server.
-     */
     public void sendFakeBlock(Player player, Location loc, Material material) {
         player.sendBlockChange(loc, material.createBlockData());
     }
@@ -404,7 +392,6 @@ public class PacketSnifferManager implements Listener {
         if (packet == null) return false;
         String name = packet.getClass().getSimpleName().toLowerCase();
 
-        // 1. Chống Crasher Book (NBT spam / Page length flood)
         if (name.contains("book") || name.contains("editbook")) {
             try {
                 for (Field f : packet.getClass().getDeclaredFields()) {
@@ -422,16 +409,14 @@ public class PacketSnifferManager implements Listener {
             } catch (Throwable ignored) {}
         }
 
-        // 2. Chống Tab-Complete Spam
         if (name.contains("commandsuggestion") || name.contains("tabcomplete")) {
             AtomicLong count = tabCompleteCounts.computeIfAbsent(player.getUniqueId(), k -> new AtomicLong(0));
             if (count.incrementAndGet() > 25) {
-                return true; // Drop spam packet
+                return true;
             }
             Bukkit.getScheduler().runTaskLater(plugin, () -> count.set(0), 20L);
         }
 
-        // 3. Chống tọa độ NaN / Infinity / Crasher Range
         if (name.contains("move") || name.contains("position")) {
             try {
                 for (Field f : packet.getClass().getDeclaredFields()) {
@@ -467,7 +452,6 @@ public class PacketSnifferManager implements Listener {
             if (tracker.timestamps.size() >= 20) {
                 long first = tracker.timestamps.peek();
                 long elapsed = now - first;
-                // 20 gói tin bình thường cần ~1000ms. Nếu gửi trong < 500ms (>40 pkts/s) -> Timer hack!
                 if (elapsed < 500L && elapsed > 0L) {
                     double rate = 20.0 / (elapsed / 1000.0);
                     plugin.getServer().getScheduler().runTask(plugin, () -> {

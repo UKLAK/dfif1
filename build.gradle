@@ -41,6 +41,7 @@ dependencies {
     compileOnly 'me.clip:placeholderapi:2.11.6'
     compileOnly 'com.mojang:brigadier:1.0.18'
     compileOnly 'io.netty:netty-transport:4.1.100.Final'
+    compileOnly 'io.netty:netty-buffer:4.1.100.Final'
     compileOnly 'io.netty:netty-common:4.1.100.Final'
 }
 
@@ -57,4 +58,23 @@ processResources {
     filesMatching('plugin.yml') {
         expand props
     }
+}
+
+sourceSets {
+    webExtension {
+        java.srcDirs = ['web-extension/src/main/java']
+        resources.srcDirs = ['web-extension/src/main/resources']
+        compileClasspath += sourceSets.main.output + configurations.compileClasspath
+    }
+}
+
+tasks.register('webJar', Jar) {
+    dependsOn classes, compileWebExtensionJava, processWebExtensionResources
+    archiveBaseName.set('JavaStudio-Web')
+    archiveVersion.set(project.version.toString())
+    from sourceSets.webExtension.output
+}
+
+tasks.named('assemble') {
+    dependsOn tasks.named('webJar')
 }

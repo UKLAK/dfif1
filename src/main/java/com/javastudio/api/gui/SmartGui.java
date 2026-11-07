@@ -13,10 +13,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
-/**
- * Trình xây dựng Menu Rương thông minh (Smart GUI & Menu Engine).
- * Cho phép tạo giao diện GUI cực kỳ ngắn gọn, an toàn và chống trộm đồ (ghost items).
- */
 public class SmartGui implements InventoryHolder {
 
     private final String title;
@@ -52,14 +48,14 @@ public class SmartGui implements InventoryHolder {
     public SmartGui fillBorder(ItemStack borderItem) {
         GuiButton btn = GuiButton.of(borderItem);
         for (int c = 0; c < 9; c++) {
-            setButton(c, btn); // Hàng đầu
+            setButton(c, btn);
             if (rows > 1) {
-                setButton((rows - 1) * 9 + c, btn); // Hàng cuối
+                setButton((rows - 1) * 9 + c, btn);
             }
         }
         for (int r = 1; r < rows - 1; r++) {
-            setButton(r * 9, btn); // Cột trái
-            setButton(r * 9 + 8, btn); // Cột phải
+            setButton(r * 9, btn);
+            setButton(r * 9 + 8, btn);
         }
         return this;
     }

@@ -8,10 +8,6 @@ import org.bukkit.entity.Player;
 
 import java.util.Locale;
 
-/**
- * RemoteBridgeManager: Cầu nối điều hành từ xa & cảnh báo thời gian thực về Discord.
- * Hỗ trợ đồng bộ cảnh báo /jac, /jsecurity, sụt giảm TPS /jdiag và thực thi lệnh cứu hộ khẩn cấp.
- */
 public class RemoteBridgeManager {
 
     private final JavaStudioPlugin plugin;
@@ -20,9 +16,6 @@ public class RemoteBridgeManager {
         this.plugin = plugin;
     }
 
-    /**
-     * Gửi cảnh báo Anti-Cheat (/jac) về kênh Discord Staff.
-     */
     public void sendAntiCheatAlert(Player player, String checkName, int vl, int ping, double tps) {
         DiscordWebhook hook = plugin.getDiscordWebhook();
         if (hook == null) return;
@@ -35,12 +28,9 @@ public class RemoteBridgeManager {
                 player.getName(), checkName, vl, ping, tps
         );
 
-        hook.sendCustomEmbed(title, description, 0xFF4500); // Màu cam đỏ
+        hook.sendCustomEmbed(title, description, 0xFF4500);
     }
 
-    /**
-     * Gửi cảnh báo An ninh / Mã độc (/jsecurity) về Discord.
-     */
     public void sendSecurityAlert(String module, String details, String severity) {
         DiscordWebhook hook = plugin.getDiscordWebhook();
         if (hook == null) return;
@@ -48,12 +38,9 @@ public class RemoteBridgeManager {
         String title = "🛡️ [Security Sentinel] Cảnh báo an ninh (" + severity.toUpperCase() + ")";
         String description = String.format("**Phân hệ**: `%s`\n**Chi tiết**: %s", module, details);
 
-        hook.sendCustomEmbed(title, description, 0xDC143C); // Màu đỏ thẫm
+        hook.sendCustomEmbed(title, description, 0xDC143C);
     }
 
-    /**
-     * Gửi cảnh báo Sụt giảm TPS / Lag Spike (/jdiag) về Discord.
-     */
     public void sendLagSpikeAlert(double tps, double mspt, int loadedChunks) {
         DiscordWebhook hook = plugin.getDiscordWebhook();
         if (hook == null) return;
@@ -67,12 +54,9 @@ public class RemoteBridgeManager {
                 tps, mspt, loadedChunks
         );
 
-        hook.sendCustomEmbed(title, description, 0xFFD700); // Màu vàng
+        hook.sendCustomEmbed(title, description, 0xFFD700);
     }
 
-    /**
-     * Thực thi các hành động cứu hộ khẩn cấp từ xa hoặc in-game.
-     */
     public boolean executeRescue(String action, CommandSender sender) {
         switch (action.toLowerCase()) {
             case "gc" -> {

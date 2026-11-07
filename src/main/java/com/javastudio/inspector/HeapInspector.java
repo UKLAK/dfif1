@@ -11,10 +11,6 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
 
-/**
- * HeapInspector: Thanh tra và điều hướng cây đối tượng JVM thời gian thực (Live Heap Inspector).
- * Cho phép đọc/sửa thuộc tính đối tượng sâu trong RAM qua Reflection Path và đo lường kích thước bộ nhớ (Shallow/Retained Size).
- */
 public class HeapInspector {
 
     @SuppressWarnings("unused")
@@ -28,9 +24,6 @@ public class HeapInspector {
 
     public record MemorySizeReport(long totalBytes, int objectCount, Map<String, Long> topFields) {}
 
-    /**
-     * Điều hướng và đọc đối tượng qua chuỗi đường dẫn (Object Graph Navigation).
-     */
     public PathResult resolve(CommandSender sender, String path) throws Exception {
         if (path == null || path.isBlank()) {
             throw new IllegalArgumentException("Đường dẫn thuộc tính không được rỗng");
@@ -41,7 +34,6 @@ public class HeapInspector {
             throw new IllegalArgumentException("Cú pháp đường dẫn không hợp lệ");
         }
 
-        // 1. Phân giải đối tượng gốc (Root Object)
         String rootKey = parts[0].trim();
         Object current = null;
 
@@ -53,12 +45,10 @@ public class HeapInspector {
         } else if (rootKey.equalsIgnoreCase("@server")) {
             current = Bukkit.getServer();
         } else {
-            // Thử tìm Plugin theo tên
             Plugin targetPlugin = Bukkit.getPluginManager().getPlugin(rootKey);
             if (targetPlugin != null) {
                 current = targetPlugin;
             } else {
-                // Thử tải qua Class.forName
                 try {
                     Class<?> clazz = Class.forName(rootKey);
                     current = clazz;
@@ -71,7 +61,6 @@ public class HeapInspector {
         Field lastField = null;
         Object parent = null;
 
-        // 2. Duyệt qua từng thuộc tính con lồng nhau
         for (int i = 1; i < parts.length; i++) {
             if (current == null) {
                 throw new NullPointerException("Thuộc tính ở bước " + parts[i - 1] + " trả về null (NullPointerException)!");
@@ -80,7 +69,6 @@ public class HeapInspector {
             String part = parts[i].trim();
             parent = current;
 
-            // Xử lý gọi hàm method()
             if (part.endsWith("()")) {
                 String methodName = part.substring(0, part.length() - 2);
                 Method method = findMethod(current.getClass(), methodName);
@@ -93,7 +81,6 @@ public class HeapInspector {
                 continue;
             }
 
-            // Xử lý Map/List index [key]
             if (part.contains("[") && part.endsWith("]")) {
                 int open = part.indexOf('[');
                 String fieldName = part.substring(0, open);
@@ -124,10 +111,8 @@ public class HeapInspector {
                 continue;
             }
 
-            // Xử lý Field bình thường
             Field field = findField(current.getClass(), part);
             if (field == null) {
-                // Thử getter
                 String getterName = "get" + Character.toUpperCase(part.charAt(0)) + part.substring(1);
                 Method getter = findMethod(current.getClass(), getterName);
                 if (getter != null) {
@@ -148,9 +133,6 @@ public class HeapInspector {
         return new PathResult(parent, lastField, current, type);
     }
 
-    /**
-     * Sửa đổi trực tiếp giá trị trường dữ liệu trong RAM.
-     */
     public Object setProperty(CommandSender sender, String path, String rawValue) throws Exception {
         PathResult res = resolve(sender, path);
         if (res.targetField() == null) {
@@ -163,7 +145,6 @@ public class HeapInspector {
         Field field = res.targetField();
         field.setAccessible(true);
 
-        // Bỏ cờ final nếu có
         try {
             Field modifiers = Field.class.getDeclaredField("modifiers");
             modifiers.setAccessible(true);
@@ -177,9 +158,6 @@ public class HeapInspector {
         return oldValue;
     }
 
-    /**
-     * Đo lường kích thước bộ nhớ (Shallow & Retained Size xấp xỉ) của đối tượng hoặc plugin.
-     */
     public MemorySizeReport calculateSizeOf(Object root) {
         if (root == null) return new MemorySizeReport(0, 0, Collections.emptyMap());
 
@@ -212,7 +190,7 @@ public class HeapInspector {
                     }
                 }
             } else {
-                totalBytes += 16L; // Header đối tượng 64-bit JVM
+                totalBytes += 16L;
                 for (Class<?> c = clazz; c != null && c != Object.class; c = c.getSuperclass()) {
                     for (Field f : c.getDeclaredFields()) {
                         if (Modifier.isStatic(f.getModifiers())) continue;

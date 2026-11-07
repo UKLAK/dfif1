@@ -9,11 +9,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
-/**
- * BytecodePatchManager: Quản lý Live Bytecode Hot-Patching (/jpm patch)
- * Cho phép chèn logic can thiệp (Hook / Prefix / Suffix) vào các plugin bên thứ ba
- * đang chạy trên máy chủ mà không cần có mã nguồn gốc hay khởi động lại server.
- */
 public class BytecodePatchManager {
 
     @SuppressWarnings("unused")
@@ -26,7 +21,7 @@ public class BytecodePatchManager {
             String targetPlugin,
             String targetClass,
             String targetMethod,
-            String patchType, // PREFIX, SUFFIX, LOG_INTERCEPT
+            String patchType,
             String description,
             long appliedTime
     ) {}
@@ -40,9 +35,6 @@ public class BytecodePatchManager {
         if (!patchFolder.exists()) patchFolder.mkdirs();
     }
 
-    /**
-     * Áp dụng một bản vá nóng vào plugin chỉ định.
-     */
     public boolean applyPatch(String targetPlugin, String targetClass, String targetMethod, String patchType, String description, StringBuilder log) {
         Plugin p = Bukkit.getPluginManager().getPlugin(targetPlugin);
         if (p == null) {
@@ -51,7 +43,6 @@ public class BytecodePatchManager {
         }
 
         try {
-            // Kiểm tra sự tồn tại của class
             Class<?> clazz = Class.forName(targetClass, false, p.getClass().getClassLoader());
             if (clazz == null) {
                 log.append("Không tìm thấy class '").append(targetClass).append("' trong ClassLoader của plugin!");
@@ -76,9 +67,6 @@ public class BytecodePatchManager {
         }
     }
 
-    /**
-     * Hủy bỏ bản vá nóng và khôi phục logic gốc.
-     */
     public boolean revertPatch(String patchId, StringBuilder log) {
         PatchRecord p = activePatches.remove(patchId);
         if (p == null) {

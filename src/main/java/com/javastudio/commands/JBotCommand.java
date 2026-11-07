@@ -17,9 +17,6 @@ import org.bukkit.plugin.Plugin;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * Lệnh điều khiển Hệ thống Fake Player Netty & Stress-Test (/jbot, /jb).
- */
 public final class JBotCommand implements CommandExecutor, TabCompleter {
 
     private final JBotEngine engine;

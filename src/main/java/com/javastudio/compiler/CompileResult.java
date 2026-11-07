@@ -6,9 +6,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Kết quả sau khi thực hiện biên dịch mã nguồn Java.
- */
 public class CompileResult {
 
     private final boolean success;
@@ -49,9 +46,6 @@ public class CompileResult {
         return classLoader;
     }
 
-    /**
-     * Nạp class chính từ classloader kết quả
-     */
     public Class<?> loadClass(String fullClassName) throws ClassNotFoundException {
         if (!success || classLoader == null) {
             throw new IllegalStateException("Biên dịch thất bại, không thể nạp class!");
@@ -59,9 +53,6 @@ public class CompileResult {
         return classLoader.loadClass(fullClassName);
     }
 
-    /**
-     * Tạo chuỗi thông báo lỗi định dạng đẹp để hiển thị trong chat Minecraft.
-     */
     public String getFormattedErrors() {
         if (customErrorMessage != null && !customErrorMessage.isBlank()) {
             return "§c✖ [Bảo Mật Sandbox] " + customErrorMessage;

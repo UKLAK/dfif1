@@ -19,12 +19,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
-/**
- * Cáº§u ná»‘i tÃ­ch há»£p chuyÃªn sÃ¢u vá»›i PlaceholderAPI (PAPI).
- * Tá»± Ä‘á»™ng Ä‘Äƒng kÃ½ PlaceholderExpansion chÃ­nh thá»©c %javastudio_...%
- * Cho phÃ©p nhÃºng mÃ£ Java tÃ­nh toÃ¡n biá»ƒu thá»©c trá»±c tiáº¿p vÃ o Scoreboard, Tablist, Chat vÃ  GUI,
- * cÃ¹ng cÃ¡c chá»‰ sá»‘ hiá»‡u nÄƒng thá»i gian thá»±c vÃ  Ä‘Äƒng kÃ½ biáº¿n tÃ¹y biáº¿n 1-Click.
- */
 public class PlaceholderApiBridge {
 
     private final JavaStudioPlugin plugin;
@@ -39,7 +33,7 @@ public class PlaceholderApiBridge {
     public void init() {
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") == null) {
             papiAvailable = false;
-            plugin.getLogger().info("[PAPI Bridge] KhÃ´ng tÃ¬m tháº¥y PlaceholderAPI trÃªn server. Cháº¿ Ä‘á»™ thay tháº¿ Ä‘á»™c láº­p kÃ­ch hoáº¡t.");
+            plugin.getLogger().info("[PAPI Bridge] Không tìm thấy PlaceholderAPI trên server. Chế độ thay thế độc lập kích hoạt.");
             return;
         }
 
@@ -47,13 +41,13 @@ public class PlaceholderApiBridge {
             expansionInstance = new JavaStudioExpansion(plugin);
             if (expansionInstance.register()) {
                 papiAvailable = true;
-                plugin.getLogger().info("[PAPI Bridge] ÄÃ£ Ä‘Äƒng kÃ½ thÃ nh cÃ´ng PlaceholderExpansion %javastudio_...% vá»›i PlaceholderAPI!");
+                plugin.getLogger().info("[PAPI Bridge] " + "\u0110\u00e3 \u0111\u0103ng k\u00fd th\u00e0nh c\u00f4ng PlaceholderExpansion %javastudio_...% v\u1edbi PlaceholderAPI!");
             } else {
-                plugin.getLogger().warning("[PAPI Bridge] KhÃ´ng thá»ƒ Ä‘Äƒng kÃ½ PlaceholderExpansion vá»›i PlaceholderAPI.");
+                plugin.getLogger().warning("[PAPI Bridge] " + "Kh\u00f4ng th\u1ec3 \u0111\u0103ng k\u00fd PlaceholderExpansion v\u1edbi PlaceholderAPI.");
             }
         } catch (Throwable e) {
             papiAvailable = false;
-            plugin.getLogger().warning("[PAPI Bridge] Lá»—i khi khá»Ÿi táº¡o PlaceholderAPI Expansion: " + e.getMessage());
+            plugin.getLogger().warning("[PAPI Bridge] " + "L\u1ed7i khi kh\u1edfi t\u1ea1o PlaceholderAPI Expansion: " + e.getMessage());
         }
     }
 
@@ -72,9 +66,6 @@ public class PlaceholderApiBridge {
         return papiAvailable;
     }
 
-    /**
-     * Dá»‹ch mÃ£ mÃ u vÃ  thay tháº¿ cÃ¡c placeholder %...% báº±ng PlaceholderAPI náº¿u cÃ³.
-     */
     public static String setPlaceholders(@Nullable Player player, @NotNull String text) {
         if (papiAvailable && player != null) {
             try {
@@ -84,11 +75,6 @@ public class PlaceholderApiBridge {
         return MessageUtil.colorize(text);
     }
 
-    /**
-     * ÄÄƒng kÃ½ má»™t biáº¿n placeholder tÃ¹y chá»‰nh 1-Click cho script/plugin Ä‘á»™ng.
-     * VÃ­ dá»¥: registerCustomPlaceholder("rank_color", p -> getRankColor(p));
-     * Sau Ä‘Ã³ gá»i trong game: %javastudio_custom_rank_color%
-     */
     public static void registerCustomPlaceholder(String key, Function<Player, String> resolver) {
         if (key != null && resolver != null) {
             customPlaceholders.put(key.toLowerCase(Locale.ROOT), resolver);
@@ -101,9 +87,6 @@ public class PlaceholderApiBridge {
         }
     }
 
-    /**
-     * Lá»›p Expansion chÃ­nh thá»©c cá»§a JavaStudio trong PlaceholderAPI.
-     */
     private static class JavaStudioExpansion extends PlaceholderExpansion {
 
         private final JavaStudioPlugin plugin;
@@ -142,13 +125,11 @@ public class PlaceholderApiBridge {
             Player player = offlinePlayer != null ? offlinePlayer.getPlayer() : null;
             String lower = params.toLowerCase(Locale.ROOT);
 
-            // 1. Biáº¿n biá»ƒu thá»©c tÃ­nh toÃ¡n trá»±c tiáº¿p %javastudio_eval:<expr>%
             if (lower.startsWith("eval:")) {
                 String expr = params.substring(5).trim();
                 return evaluateInlineExpression(player, expr);
             }
 
-            // 2. Biến do dynamic plugin/script đăng ký (%javastudio_custom_<key>% hoặc %javastudio_<key>%)
             if (lower.startsWith("custom_")) {
                 String customKey = lower.substring(7);
                 Function<Player, String> resolver = customPlaceholders.get(customKey);
@@ -176,7 +157,6 @@ public class PlaceholderApiBridge {
             ServerController sc = plugin.getServerController();
             ServerController.MemoryInfo mem = sc != null ? sc.getMemoryInfo() : null;
 
-            // 3. CÃ¡c chá»‰ sá»‘ hiá»‡u nÄƒng mÃ¡y chá»§
             return switch (lower) {
                 case "tps" -> {
                     double[] tps = sc != null ? sc.getTPS() : new double[]{20.0};
@@ -201,17 +181,14 @@ public class PlaceholderApiBridge {
                 case "java_version" -> String.valueOf(PlatformUtil.getJavaVersion());
                 case "virtual_threads" -> PlatformUtil.isVirtualThreadsSupported() ? "Enabled" : "Disabled";
 
-                // Chá»‰ sá»‘ quáº£n lÃ½ plugin & script Ä‘á»™ng
                 case "plugins_count" -> String.valueOf(plugin.getPluginManager().getActivePlugins().size());
                 case "scripts_count" -> String.valueOf(plugin.getScriptManager().getAvailableScripts().size());
 
-                // Chá»‰ sá»‘ báº£o máº­t ExploitGuard
                 case "exploit_blocked" -> plugin.getExploitGuard() != null ?
                         String.valueOf(plugin.getExploitGuard().getStats().getPacketsBlocked()) : "0";
                 case "exploit_checked" -> plugin.getExploitGuard() != null ?
                         String.valueOf(plugin.getExploitGuard().getStats().getTotalPacketsChecked()) : "0";
 
-                // Chỉ số Anti-Cheat
                 case "ac_status" -> (plugin.getAntiCheatManager() != null && plugin.getAntiCheatManager().isActive()) ? "Active" : "Disabled";
                 case "ac_flags_total" -> plugin.getAntiCheatManager() != null ? String.valueOf(plugin.getAntiCheatManager().getTotalFlags()) : "0";
                 case "ac_punishments" -> plugin.getAntiCheatManager() != null ? String.valueOf(plugin.getAntiCheatManager().getTotalPunishments()) : "0";
@@ -237,7 +214,6 @@ public class PlaceholderApiBridge {
                     yield "0";
                 }
 
-                // Chá»‰ sá»‘ Cluster / Network
                 case "cluster_status" -> plugin.getClusterHub() != null && plugin.getClusterHub().getRedis() != null && plugin.getClusterHub().getRedis().isConnected() ?
                         "REDIS_ONLINE" : "STANDALONE";
 
@@ -245,13 +221,9 @@ public class PlaceholderApiBridge {
             };
         }
 
-        /**
-         * TÃ­nh toÃ¡n biá»ƒu thá»©c Ä‘á»™ng inline cho placeholder.
-         */
         private String evaluateInlineExpression(@Nullable Player player, String expr) {
             if (expr.isEmpty()) return "";
 
-            // Má»™t sá»‘ hÃ m tiá»‡n Ã­ch nhanh khÃ´ng cáº§n qua compiler
             if (player != null) {
                 switch (expr) {
                     case "player.getName()" -> { return player.getName(); }
@@ -265,7 +237,6 @@ public class PlaceholderApiBridge {
                 }
             }
 
-            // Náº¿u lÃ  phÃ©p toÃ¡n cÆ¡ báº£n sá»‘ há»c: vÃ­ dá»¥ player.getHealth() * 5
             try {
                 if (player != null && expr.startsWith("player.getHealth()") && expr.contains("*")) {
                     String factorStr = expr.substring(expr.indexOf('*') + 1).trim();

@@ -5,6 +5,7 @@ import com.javastudio.anticheat.AntiCheatManager;
 import com.javastudio.anticheat.CheckSettings;
 import com.javastudio.anticheat.CheckType;
 import com.javastudio.anticheat.PlayerData;
+import com.javastudio.anticheat.WebDashboardService;
 import com.javastudio.utils.MessageUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -18,10 +19,6 @@ import org.bukkit.entity.Player;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * Lệnh điều khiển, cấu hình và giám sát Anti-Cheat (/jac, /anticheat, /jstudioac).
- * Cung cấp khả năng tinh chỉnh trực tiếp các check tương tự Vulcan/Grim/Matrix.
- */
 public final class JAntiCheatCommand implements CommandExecutor, TabCompleter {
 
     private final JavaStudioPlugin plugin;
@@ -36,6 +33,12 @@ public final class JAntiCheatCommand implements CommandExecutor, TabCompleter {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("javastudio.admin") && !sender.isOp()) {
             MessageUtil.sendError(sender, "Bạn không có quyền quản lý Anti-Cheat (cần javastudio.admin)!");
+            return true;
+        }
+
+        if (!plugin.getSettingsManager().isAntiCheatEnabled()) {
+            MessageUtil.sendError(sender, "Phân hệ Anti-Cheat (/jac) đang bị TẮT trong cài đặt!");
+            MessageUtil.sendInfo(sender, "Bật lại bằng lệnh: &e/javastudio toggle anticheat &7hoặc qua &e/javastudio settings");
             return true;
         }
 
@@ -61,8 +64,10 @@ public final class JAntiCheatCommand implements CommandExecutor, TabCompleter {
             case "top" -> handleTop(sender, args);
             case "inspect" -> handleInspect(sender, args, label);
             case "replay" -> handleReplay(sender, args, label);
+            case "reports", "report" -> handleReports(sender, args, label);
             case "record" -> handleRecord(sender, args, label);
             case "test" -> handleTest(sender, args, label);
+            case "selftest", "verify" -> manager.runSelfTest(sender);
             case "exemptops" -> handleExemptOps(sender, args, label);
             case "bot" -> handleBot(sender, args, label);
             case "web", "dashboard" -> handleWeb(sender, args, label);
@@ -87,7 +92,7 @@ public final class JAntiCheatCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(" §8» §e/" + label + " alerts [on|off] §7- Bật/tắt nhận cảnh báo vi phạm trực tiếp");
         sender.sendMessage(" §8» §e/" + label + " info <player> §7- Xem chi tiết điểm phạt (VL) của người chơi");
         sender.sendMessage(" §8» §e/" + label + " reset <player|all> §7- Xóa toàn bộ điểm phạt vi phạm");
-        sender.sendMessage(" §8» §e/" + label + " checks [movement|combat|world] §7- Danh sách 30+ check bảo vệ");
+        sender.sendMessage(" §8» §e/" + label + " checks [movement|combat|world] §7- Danh sách 42 check bảo vệ");
         sender.sendMessage(" §8» §e/" + label + " toggle <check> §7- Bật/tắt nhanh 1 check và lưu config");
         sender.sendMessage(" §8» §e/" + label + " set <check> <thuộc_tính> <giá_trị> §7- Chỉnh tham số check live");
         sender.sendMessage(" §8» §e/" + label + " logs [số_dòng] §7- Xem nhật ký vi phạm gần nhất");
@@ -97,9 +102,12 @@ public final class JAntiCheatCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(" §8» §e/" + label + " unfreeze <player> §7- Mở khóa đóng băng cho người chơi");
         sender.sendMessage(" §8» §e/" + label + " top §7- Xem bảng xếp hạng TOP 10 người chơi vi phạm");
         sender.sendMessage(" §8» §e/" + label + " inspect <player> §7- Soi nhanh Ping, CPS, góc quay & vi phạm");
-        sender.sendMessage(" §8» §e/" + label + " replay [list|play|stop|delete] §7- Xem lại hiện trường vi phạm bằng Ghost Mannequin");
+        sender.sendMessage(" §8» §e/" + label + " replay [play|pause|resume|speed|stop|list|info|delete] §7- Điều khiển chiếu lại hiện trường 3D");
+        sender.sendMessage(" §8» §e/" + label + " reports §7- Quản lý danh sách các đơn tố cáo từ người chơi");
+        sender.sendMessage(" §8» §e/" + label + " report <claim|resolve|dismiss> <id> §7- Xử lý đơn tố cáo");
         sender.sendMessage(" §8» §e/" + label + " record <player> §7- Lưu thủ công clip 20s của nghi phạm");
         sender.sendMessage(" §8» §e/" + label + " test [player] §7- Bật/tắt chế độ test hack cho Admin/OP (bỏ qua miễn trừ)");
+        sender.sendMessage(" §8» §e/" + label + " selftest §7- Chạy tự kiểm định toán học, Neural, Backtrack & hiệu năng");
         sender.sendMessage(" §8» §e/" + label + " exemptops [on|off] §7- Bật/tắt tự động miễn trừ toàn bộ OP");
         sender.sendMessage(" §8» §e/" + label + " bot <player> [giây] §7- Triệu hồi AuraBot tàng hình bẫy KillAura nghi phạm");
         sender.sendMessage(" §8» §e/" + label + " web [start|stop|info] §7- Quản lý Web Dashboard & Live 3D Radar");
@@ -114,6 +122,7 @@ public final class JAntiCheatCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(" §8» §7Số người chơi đang theo dõi: §e" + manager.getPlayers().size());
         sender.sendMessage(" §8» §7Tổng vi phạm (Flags): §c" + String.format("%,d", manager.getTotalFlags()));
         sender.sendMessage(" §8» §7Tổng lượt xử phạt (Punishments): §4§l" + String.format("%,d", manager.getTotalPunishments()));
+        sender.sendMessage(" §8» §7Netty Packet Shield đã chặn: §b" + String.format("%,d", manager.getNettyDroppedPackets()) + " gói tin rác/crash");
         sender.sendMessage(" §8» §7Quyền Bypass: §6" + manager.getBypassPermission());
         sender.sendMessage(" §8» §7Quyền nhận Alerts: §6" + manager.getAlertPermission());
         sender.sendMessage(" §8» §7Gõ §b/" + label + " checks §7để xem trạng thái chi tiết của từng check.");
@@ -411,7 +420,7 @@ public final class JAntiCheatCommand implements CommandExecutor, TabCompleter {
         }
         PlayerData d = manager.data(target);
         int ping = manager.safePing(target);
-        int cps = d.clicks.size();
+        int cps = d.getLiveCps();
         Location loc = target.getLocation();
 
         sender.sendMessage("§b╔════════════════════════════════════════════════════╗");
@@ -419,6 +428,7 @@ public final class JAntiCheatCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§b╚════════════════════════════════════════════════════╝");
         sender.sendMessage(" §8» §7Ping mạng: " + (ping > 250 ? "§c" : "§a") + ping + "ms §8| §7CPS hiện tại: §f" + cps);
         sender.sendMessage(String.format(" §8» §7Tốc độ ngang: §e%.2f §8| §7Độ lệch góc Yaw/Pitch: §f%.1f°/%.1f°", d.lastH, d.yawDelta, d.pitchDelta));
+        sender.sendMessage(String.format(" §8» §7Neural MLP: §d%.2f §8(§f%s§8) §8| §7Cluster: §b%s", d.neuralScore, d.neuralClassification, d.clusterGroup != null ? d.clusterGroup.name() : "LEGIT_CASUAL"));
         sender.sendMessage(String.format(" §8» §7Vị trí: §f%s, %.1f, %.1f, %.1f", loc.getWorld().getName(), loc.getX(), loc.getY(), loc.getZ()));
         sender.sendMessage(" §8» §7Trạng thái Freeze: " + (d.isFrozen ? "§c§lBỊ KHÓA BỞI " + d.frozenBy : "§aBình thường"));
         sender.sendMessage(" §8» §7Tổng điểm vi phạm (Total VL): §c" + String.format("%.1f", d.getTotalVl()) + " §8| §7Cờ: §e" + d.totalFlags);
@@ -441,7 +451,8 @@ public final class JAntiCheatCommand implements CommandExecutor, TabCompleter {
             for (var inc : incidents) {
                 MessageUtil.sendRaw(sender, "  &b• &e[" + inc.id + "] &f" + inc.playerName + " &7- &c" + inc.checkName + " &8(VL: " + inc.vl + ") &7[" + inc.timestamp + "]");
             }
-            MessageUtil.sendRaw(sender, "  &7Xem lại hiện trường: &e/" + label + " replay play <id>");
+            MessageUtil.sendRaw(sender, "  &7Xem lại hiện trường: &e/" + label + " replay play <id> [tốc_độ]");
+            MessageUtil.sendRaw(sender, "  &7Tạm dừng / Tiếp tục: &e/" + label + " replay pause &8| &e/" + label + " replay resume");
             return;
         }
         String action = args[1].toLowerCase();
@@ -451,20 +462,71 @@ public final class JAntiCheatCommand implements CommandExecutor, TabCompleter {
                 return;
             }
             if (args.length < 3) {
-                MessageUtil.sendError(sender, "Cách dùng: /" + label + " replay play <id_clip>");
+                MessageUtil.sendError(sender, "Cách dùng: /" + label + " replay play <id_clip> [tốc_độ: 0.5|1.0|2.0]");
                 return;
             }
             String clipId = args[2];
-            boolean ok = rm.playReplay(staff, clipId);
+            double speed = 1.0;
+            if (args.length >= 4) {
+                try {
+                    speed = Double.parseDouble(args[3]);
+                } catch (Throwable ignored) {}
+            }
+            boolean ok = rm.playReplay(staff, clipId, speed);
             if (ok) {
-                MessageUtil.sendSuccess(sender, "Đang chiếu lại hiện trường vi phạm clip &e" + clipId + " &abằng Ghost Mannequin!");
-                MessageUtil.sendInfo(sender, "Gõ &e/" + label + " replay stop &7để dừng sớm bất kỳ lúc nào.");
+                MessageUtil.sendSuccess(sender, "Đang chiếu lại clip &e" + clipId + " &a(Tốc độ: &e" + speed + "x&a) bằng Ghost Mannequin!");
+                MessageUtil.sendInfo(sender, "Lệnh điều khiển: &e/" + label + " replay pause &8| &e/" + label + " replay resume &8| &e/" + label + " replay stop");
             } else {
                 MessageUtil.sendError(sender, "Không tìm thấy clip vi phạm có mã '" + clipId + "'!");
+            }
+        } else if (action.equals("pause")) {
+            if (rm.pausePlayback()) {
+                MessageUtil.sendSuccess(sender, "Đã tạm dừng chiếu lại clip hiện trường.");
+            } else {
+                MessageUtil.sendWarning(sender, "Hiện không có clip nào đang phát hoặc clip đã bị tạm dừng.");
+            }
+        } else if (action.equals("resume")) {
+            if (rm.resumePlayback()) {
+                MessageUtil.sendSuccess(sender, "Đã tiếp tục chiếu lại clip hiện trường.");
+            } else {
+                MessageUtil.sendWarning(sender, "Hiện không có clip nào đang bị tạm dừng.");
+            }
+        } else if (action.equals("speed")) {
+            if (args.length < 3) {
+                MessageUtil.sendError(sender, "Cách dùng: /" + label + " replay speed <tốc_độ: 0.5|1.0|2.0|4.0>");
+                return;
+            }
+            try {
+                double spd = Double.parseDouble(args[2]);
+                if (rm.setSpeed(spd)) {
+                    MessageUtil.sendSuccess(sender, "Đã chuyển tốc độ phát lại thành: &e" + spd + "x");
+                } else {
+                    MessageUtil.sendWarning(sender, "Hiện không có clip nào đang được phát lại.");
+                }
+            } catch (Throwable t) {
+                MessageUtil.sendError(sender, "Tốc độ không hợp lệ! Vui lòng nhập số (vd: 0.5, 1.0, 2.0)");
             }
         } else if (action.equals("stop")) {
             rm.stopPlayback();
             MessageUtil.sendSuccess(sender, "Đã dừng chiếu lại hiện trường!");
+        } else if (action.equals("info")) {
+            if (args.length < 3) {
+                MessageUtil.sendError(sender, "Cách dùng: /" + label + " replay info <id_clip>");
+                return;
+            }
+            var inc = rm.getIncident(args[2]);
+            if (inc != null) {
+                MessageUtil.send(sender, "&6=== THÔNG TIN CLIP REPLAY: &e" + inc.id + " &6===");
+                MessageUtil.sendRaw(sender, "  &7Người chơi bị nghi vấn: &e" + inc.playerName);
+                MessageUtil.sendRaw(sender, "  &7Check kích hoạt: &c" + inc.checkName);
+                MessageUtil.sendRaw(sender, "  &7Điểm vi phạm (VL): &f" + inc.vl);
+                MessageUtil.sendRaw(sender, "  &7Thế giới: &a" + inc.worldName);
+                MessageUtil.sendRaw(sender, "  &7Thời gian ghi: &b" + inc.timestamp);
+                MessageUtil.sendRaw(sender, "  &7Tổng số frames: &6" + inc.frames.size() + " ticks");
+                MessageUtil.sendRaw(sender, "  &8» &7Xem lại: &e/" + label + " replay play " + inc.id);
+            } else {
+                MessageUtil.sendError(sender, "Không tìm thấy clip: " + args[2]);
+            }
         } else if (action.equals("delete") || action.equals("del")) {
             if (args.length < 3) {
                 MessageUtil.sendError(sender, "Cách dùng: /" + label + " replay delete <id_clip>");
@@ -473,6 +535,68 @@ public final class JAntiCheatCommand implements CommandExecutor, TabCompleter {
             boolean ok = rm.deleteIncident(args[2]);
             if (ok) MessageUtil.sendSuccess(sender, "Đã xóa clip: &e" + args[2]);
             else MessageUtil.sendError(sender, "Không tìm thấy clip: " + args[2]);
+        }
+    }
+
+    private void handleReports(CommandSender sender, String[] args, String label) {
+        var repMgr = manager.getReportManager();
+        if (repMgr == null) {
+            MessageUtil.sendError(sender, "ReportManager chưa sẵn sàng!");
+            return;
+        }
+
+        if (args.length >= 2 && args[1].equalsIgnoreCase("claim")) {
+            if (args.length < 3) {
+                MessageUtil.sendError(sender, "Cách dùng: /" + label + " report claim <id_đơn>");
+                return;
+            }
+            boolean ok = repMgr.claimReport(args[2], sender.getName());
+            if (ok) MessageUtil.sendSuccess(sender, "Bạn đã tiếp nhận điều tra đơn tố cáo &e" + args[2] + "&a!");
+            else MessageUtil.sendError(sender, "Không tìm thấy đơn tố cáo có mã '" + args[2] + "'!");
+            return;
+        }
+
+        if (args.length >= 2 && args[1].equalsIgnoreCase("resolve")) {
+            if (args.length < 3) {
+                MessageUtil.sendError(sender, "Cách dùng: /" + label + " report resolve <id_đơn> [kết_luận]");
+                return;
+            }
+            String verdict = args.length >= 4 ? String.join(" ", Arrays.copyOfRange(args, 3, args.length)) : "Đã xử phạt vi phạm";
+            boolean ok = repMgr.resolveReport(args[2], sender.getName(), verdict);
+            if (ok) MessageUtil.sendSuccess(sender, "Đã đóng đơn tố cáo &e" + args[2] + " &avới kết luận: &f" + verdict);
+            else MessageUtil.sendError(sender, "Không tìm thấy đơn tố cáo: " + args[2]);
+            return;
+        }
+
+        if (args.length >= 2 && args[1].equalsIgnoreCase("dismiss")) {
+            if (args.length < 3) {
+                MessageUtil.sendError(sender, "Cách dùng: /" + label + " report dismiss <id_đơn>");
+                return;
+            }
+            boolean ok = repMgr.dismissReport(args[2], sender.getName());
+            if (ok) MessageUtil.sendSuccess(sender, "Đã bác bỏ đơn tố cáo &e" + args[2] + " &a(Không có vi phạm).");
+            else MessageUtil.sendError(sender, "Không tìm thấy đơn tố cáo: " + args[2]);
+            return;
+        }
+
+        var list = repMgr.getReportsHistory();
+        if (list.isEmpty()) {
+            MessageUtil.sendInfo(sender, "Hiện tại không có đơn tố cáo nào.");
+            return;
+        }
+        MessageUtil.send(sender, "&6=== DANH SÁCH ĐƠN TỐ CÁO (" + list.size() + ") ===");
+        for (var r : list) {
+            String stBadge = switch (r.status) {
+                case PENDING -> "§c§l[CHỜ XỬ LÝ]";
+                case INVESTIGATING -> "§e§l[ĐANG ĐIỀU TRA: " + r.handledBy + "]";
+                case RESOLVED -> "§a§l[ĐÃ GIẢI QUYẾT]";
+                case DISMISSED -> "§8§l[BÁC BỎ]";
+            };
+            MessageUtil.sendRaw(sender, String.format("  §b• §e[%s] §f%s §7tố cáo §c§l%s §8(§f%s§8) %s §7[%s]",
+                    r.id, r.reporterName, r.targetName, r.reason, stBadge, r.timestamp));
+            if (!"none".equals(r.replayId)) {
+                MessageUtil.sendRaw(sender, "    §8» §7Replay: §6/" + label + " replay play " + r.replayId + " §8| §e/" + label + " report claim " + r.id);
+            }
         }
     }
 
@@ -576,35 +700,53 @@ public final class JAntiCheatCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleWeb(CommandSender sender, String[] args, String label) {
-        if (manager.getWebDashboard() == null) {
-            MessageUtil.sendError(sender, "Web Dashboard chưa được khởi tạo!");
+        WebDashboardService web = manager.getWebDashboard();
+        if (web == null) {
+            MessageUtil.sendWarning(sender, "Phân hệ Web Dashboard đã được tách ra thành plugin mở rộng độc lập!");
+            MessageUtil.sendInfo(sender, "Hãy cài thêm &eJavaStudio-Web-1.0.0.jar &7vào thư mục &fplugins/ &7cùng với JavaStudio để kích hoạt.");
             return;
         }
+        Player viewer = sender instanceof Player p ? p : null;
         if (args.length < 2 || args[1].equalsIgnoreCase("info") || args[1].equalsIgnoreCase("status")) {
-            boolean running = manager.getWebDashboard().isRunning();
-            int port = manager.getWebDashboard().getPort();
-            String token = manager.getWebDashboard().getAuthToken();
-            sender.sendMessage("§b§l=== WEB DASHBOARD & LIVE RADAR ===");
+            boolean running = web.isRunning();
+            boolean singlePort = web.isSinglePortActive();
+            String url = web.getPublicAccessUrl(viewer);
+            String token = web.getAuthToken();
+            sender.sendMessage("§b§l=== WEB DASHBOARD & LIVE RADAR (EXTENSION) ===");
             sender.sendMessage(" §8» §7Trạng thái: " + (running ? "§a§lĐANG CHẠY" : "§c§lĐÃ DỪNG"));
-            sender.sendMessage(" §8» §7Địa chỉ truy cập: §bhttp://localhost:" + port + "/anticheat");
+            sender.sendMessage(" §8» §7Chế độ cổng: " + (singlePort
+                    ? "§a§lPANEL 1-PORT §7(Đi chung cổng Minecraft §e:" + Bukkit.getPort() + " §8-> §7nội bộ §f127.0.0.1:" + web.getInternalPort() + "§7)"
+                    : "§e§lCỔNG ĐỘC LẬP §7(:" + web.getInternalPort() + ")"));
+            sender.sendMessage(" §8» §7Link đăng nhập 1-click: §b" + url);
+            if (viewer != null && !url.contains("<")) {
+                try {
+                    net.kyori.adventure.text.Component clickMsg = net.kyori.adventure.text.Component.text(" » [NHẤN VÀO ĐÂY ĐỂ MỞ WEB DASHBOARD TRÊN TRÌNH DUYỆT]")
+                            .color(net.kyori.adventure.text.format.NamedTextColor.GREEN)
+                            .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD)
+                            .clickEvent(net.kyori.adventure.text.event.ClickEvent.openUrl(url))
+                            .hoverEvent(net.kyori.adventure.text.event.HoverEvent.showText(
+                                    net.kyori.adventure.text.Component.text("Mở " + url)));
+                    viewer.sendMessage(clickMsg);
+                } catch (Throwable ignored) {}
+            }
             sender.sendMessage(" §8» §7Mã xác thực (Token): §e" + token);
-            sender.sendMessage(" §8» §7Lệnh điều khiển: §e/" + label + " web [start|stop|restart]");
+            sender.sendMessage(" §8» §7Lệnh điều khiển: §e/" + label + " web [start|stop|restart] §7hoặc §e/jweb");
             return;
         }
         String action = args[1].toLowerCase();
         switch (action) {
             case "start" -> {
-                manager.getWebDashboard().start();
-                MessageUtil.sendSuccess(sender, "Đã khởi động Web Dashboard tại: §bhttp://localhost:" + manager.getWebDashboard().getPort() + "/anticheat");
+                web.start();
+                MessageUtil.sendSuccess(sender, "Đã khởi động Web Dashboard tại: §b" + web.getPublicAccessUrl(viewer));
             }
             case "stop" -> {
-                manager.getWebDashboard().stop();
+                web.stop();
                 MessageUtil.sendWarning(sender, "Đã dừng dịch vụ Web Dashboard.");
             }
             case "restart" -> {
-                manager.getWebDashboard().stop();
-                manager.getWebDashboard().start();
-                MessageUtil.sendSuccess(sender, "Đã khởi động lại Web Dashboard.");
+                web.stop();
+                web.start();
+                MessageUtil.sendSuccess(sender, "Đã khởi động lại Web Dashboard tại: §b" + web.getPublicAccessUrl(viewer));
             }
             default -> MessageUtil.sendError(sender, "Cú pháp: /" + label + " web [info|start|stop|restart]");
         }
@@ -646,8 +788,11 @@ public final class JAntiCheatCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (!sender.hasPermission("javastudio.admin") && !sender.isOp()) {
+            return Collections.emptyList();
+        }
         if (args.length == 1) {
-            return filter(Arrays.asList("status", "alerts", "info", "reset", "checks", "toggle", "set", "logs", "exempt", "debug", "freeze", "unfreeze", "top", "inspect", "replay", "record", "test", "exemptops", "bot", "web", "wave", "reload", "help"), args[0]);
+            return filter(Arrays.asList("status", "alerts", "info", "reset", "checks", "toggle", "set", "logs", "exempt", "debug", "freeze", "unfreeze", "top", "inspect", "replay", "record", "reports", "report", "test", "selftest", "exemptops", "bot", "web", "wave", "reload", "help"), args[0]);
         }
         if (args.length == 2) {
             String sub = args[0].toLowerCase();
@@ -664,7 +809,10 @@ public final class JAntiCheatCommand implements CommandExecutor, TabCompleter {
                 return filter(Arrays.asList("on", "off"), args[1]);
             }
             if (sub.equals("replay")) {
-                return filter(Arrays.asList("list", "play", "stop", "delete"), args[1]);
+                return filter(Arrays.asList("list", "play", "pause", "resume", "speed", "info", "stop", "delete"), args[1]);
+            }
+            if (sub.equals("reports") || sub.equals("report")) {
+                return filter(Arrays.asList("list", "claim", "resolve", "dismiss"), args[1]);
             }
             if (sub.equals("reset")) {
                 List<String> list = new ArrayList<>();

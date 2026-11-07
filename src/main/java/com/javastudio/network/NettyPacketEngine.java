@@ -1,6 +1,7 @@
 package com.javastudio.network;
 
 import com.javastudio.JavaStudioPlugin;
+import com.javastudio.utils.PlatformUtil;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -15,16 +16,14 @@ import org.bukkit.event.player.PlayerQuitEvent;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiPredicate;
 import java.util.logging.Logger;
 
-/**
- * NettyPacketEngine: Can thiệp tầng Netty Packet cấp thấp (Low-Level Netty Runtime).
- * Hoạt động độc lập không cần ProtocolLib trên Paper, Purpur, Spigot và Folia.
- */
 public final class NettyPacketEngine implements Listener {
 
     private static final String HANDLER_NAME = "javastudio_packet_interceptor";
@@ -35,22 +34,36 @@ public final class NettyPacketEngine implements Listener {
     private final Map<String, BiPredicate<Player, Object>> inboundFilters = new ConcurrentHashMap<>();
     private final Map<String, BiPredicate<Player, Object>> outboundFilters = new ConcurrentHashMap<>();
     private final Set<String> cancelledPacketNames = ConcurrentHashMap.newKeySet();
-    private final Map<Player, Channel> hookedChannels = new ConcurrentHashMap<>();
+    private final Map<UUID, Channel> hookedChannels = new ConcurrentHashMap<>();
+
+    private volatile boolean started;
+    private volatile boolean listenerRegistered;
+
+    private volatile Method cachedGetHandle;
+    private volatile Field cachedConnectionField;
+    private volatile Field cachedNetworkManagerField;
+    private volatile Field cachedChannelField;
 
     public NettyPacketEngine(JavaStudioPlugin plugin) {
         this.plugin = plugin;
         this.logger = plugin.getLogger();
     }
 
-    public void start() {
-        Bukkit.getPluginManager().registerEvents(this, plugin);
+    public synchronized void start() {
+        if (started) return;
+        started = true;
+        if (!listenerRegistered) {
+            Bukkit.getPluginManager().registerEvents(this, plugin);
+            listenerRegistered = true;
+        }
         for (Player p : Bukkit.getOnlinePlayers()) {
             injectPlayer(p);
         }
         logger.info("[NettyPacketEngine] Đã kích hoạt bộ can thiệp Netty ChannelDuplexHandler cấp thấp!");
     }
 
-    public void stop() {
+    public synchronized void stop() {
+        started = false;
         for (Player p : Bukkit.getOnlinePlayers()) {
             uninjectPlayer(p);
         }
@@ -60,10 +73,19 @@ public final class NettyPacketEngine implements Listener {
         cancelledPacketNames.clear();
     }
 
+    public boolean isStarted() {
+        return started;
+    }
+
     @EventHandler(priority = EventPriority.LOWEST)
     public void onJoin(PlayerJoinEvent event) {
-        // Trì hoãn 1 tick để kết nối Netty được khởi tạo hoàn toàn
-        Bukkit.getScheduler().runTaskLater(plugin, () -> injectPlayer(event.getPlayer()), 1L);
+        if (!started) return;
+        Player player = event.getPlayer();
+        PlatformUtil.runAtEntityLater(plugin, player, () -> {
+            if (started && player.isOnline()) {
+                injectPlayer(player);
+            }
+        }, 1L);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -72,22 +94,30 @@ public final class NettyPacketEngine implements Listener {
     }
 
     public void injectPlayer(Player player) {
-        if (player == null || !player.isOnline()) return;
+        if (!started || player == null || !player.isOnline()) return;
         Channel channel = getChannel(player);
-        if (channel == null) return;
-        if (channel.pipeline().get(HANDLER_NAME) != null) return;
+        if (channel == null || !channel.isOpen()) return;
+        if (channel.pipeline().get(HANDLER_NAME) != null) {
+            hookedChannels.put(player.getUniqueId(), channel);
+            return;
+        }
 
+        final UUID playerId = player.getUniqueId();
         ChannelDuplexHandler handler = new ChannelDuplexHandler() {
             @Override
             public void channelRead(ChannelHandlerContext ctx, Object packet) throws Exception {
-                String packetName = packet.getClass().getSimpleName();
-                if (cancelledPacketNames.contains(packetName)) return;
+                if (packet != null) {
+                    String packetName = packet.getClass().getSimpleName();
+                    if (cancelledPacketNames.contains(packetName)) return;
 
-                for (BiPredicate<Player, Object> filter : inboundFilters.values()) {
-                    try {
-                        if (!filter.test(player, packet)) return;
-                    } catch (Throwable t) {
-                        logger.warning("[NettyPacketEngine] Lỗi trong Inbound Filter: " + t.getMessage());
+                    if (!inboundFilters.isEmpty()) {
+                        for (BiPredicate<Player, Object> filter : inboundFilters.values()) {
+                            try {
+                                if (!filter.test(player, packet)) return;
+                            } catch (Throwable t) {
+                                logger.warning("[NettyPacketEngine] Lỗi trong Inbound Filter: " + t.getMessage());
+                            }
+                        }
                     }
                 }
                 super.channelRead(ctx, packet);
@@ -95,29 +125,39 @@ public final class NettyPacketEngine implements Listener {
 
             @Override
             public void write(ChannelHandlerContext ctx, Object packet, ChannelPromise promise) throws Exception {
-                String packetName = packet.getClass().getSimpleName();
-                if (cancelledPacketNames.contains(packetName)) return;
+                if (packet != null) {
+                    String packetName = packet.getClass().getSimpleName();
+                    if (cancelledPacketNames.contains(packetName)) return;
 
-                for (BiPredicate<Player, Object> filter : outboundFilters.values()) {
-                    try {
-                        if (!filter.test(player, packet)) return;
-                    } catch (Throwable t) {
-                        logger.warning("[NettyPacketEngine] Lỗi trong Outbound Filter: " + t.getMessage());
+                    if (!outboundFilters.isEmpty()) {
+                        for (BiPredicate<Player, Object> filter : outboundFilters.values()) {
+                            try {
+                                if (!filter.test(player, packet)) return;
+                            } catch (Throwable t) {
+                                logger.warning("[NettyPacketEngine] Lỗi trong Outbound Filter: " + t.getMessage());
+                            }
+                        }
                     }
                 }
                 super.write(ctx, packet, promise);
+            }
+
+            @Override
+            public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+                hookedChannels.remove(playerId);
+                super.channelInactive(ctx);
             }
         };
 
         channel.eventLoop().submit(() -> {
             try {
-                if (channel.pipeline().get(HANDLER_NAME) == null) {
+                if (channel.isOpen() && channel.pipeline().get(HANDLER_NAME) == null) {
                     if (channel.pipeline().get("packet_handler") != null) {
                         channel.pipeline().addBefore("packet_handler", HANDLER_NAME, handler);
                     } else {
                         channel.pipeline().addFirst(HANDLER_NAME, handler);
                     }
-                    hookedChannels.put(player, channel);
+                    hookedChannels.put(playerId, channel);
                 }
             } catch (Throwable t) {
                 logger.warning("[NettyPacketEngine] Không thể ghim handler cho " + player.getName() + ": " + t.getMessage());
@@ -127,7 +167,7 @@ public final class NettyPacketEngine implements Listener {
 
     public void uninjectPlayer(Player player) {
         if (player == null) return;
-        Channel channel = hookedChannels.remove(player);
+        Channel channel = hookedChannels.remove(player.getUniqueId());
         if (channel == null) {
             channel = getChannel(player);
         }
@@ -165,44 +205,96 @@ public final class NettyPacketEngine implements Listener {
     }
 
     public Set<String> getCancelledPackets() {
-        return java.util.Collections.unmodifiableSet(cancelledPacketNames);
+        return Collections.unmodifiableSet(cancelledPacketNames);
     }
 
     public int getHookedCount() {
         return hookedChannels.size();
     }
 
+    public void sendPacket(Player player, Object packet) {
+        if (player == null || packet == null) return;
+        Channel ch = hookedChannels.get(player.getUniqueId());
+        if (ch == null) ch = getChannel(player);
+        if (ch != null && ch.isOpen()) {
+            final Channel targetChannel = ch;
+            targetChannel.eventLoop().execute(() -> targetChannel.writeAndFlush(packet));
+        }
+    }
+
+    public void broadcastPacket(Object packet) {
+        if (packet == null) return;
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            sendPacket(p, packet);
+        }
+    }
+
     public Channel getChannel(Player player) {
         try {
-            Method getHandle = player.getClass().getMethod("getHandle");
-            Object serverPlayer = getHandle.invoke(player);
-
-            for (Field field : serverPlayer.getClass().getDeclaredFields()) {
-                field.setAccessible(true);
-                Object conn = field.get(serverPlayer);
-                if (conn != null && conn.getClass().getSimpleName().contains("GamePacketListener")) {
-                    for (Field connField : conn.getClass().getSuperclass().getDeclaredFields()) {
-                        connField.setAccessible(true);
-                        Object netManager = connField.get(conn);
-                        if (netManager != null) {
-                            for (Field chField : netManager.getClass().getDeclaredFields()) {
-                                if (Channel.class.isAssignableFrom(chField.getType())) {
-                                    chField.setAccessible(true);
-                                    return (Channel) chField.get(netManager);
-                                }
+            if (cachedGetHandle != null && cachedConnectionField != null && cachedChannelField != null) {
+                Object handle = cachedGetHandle.invoke(player);
+                if (handle != null) {
+                    Object conn = cachedConnectionField.get(handle);
+                    if (conn != null) {
+                        Object holder = cachedNetworkManagerField != null ? cachedNetworkManagerField.get(conn) : conn;
+                        if (holder != null) {
+                            Object ch = cachedChannelField.get(holder);
+                            if (ch instanceof Channel channel) {
+                                return channel;
                             }
                         }
                     }
-                    // Thử tìm Channel trực tiếp trong conn
-                    for (Field chField : conn.getClass().getDeclaredFields()) {
-                        if (Channel.class.isAssignableFrom(chField.getType())) {
-                            chField.setAccessible(true);
-                            return (Channel) chField.get(conn);
+                }
+            }
+
+            Method getHandle = player.getClass().getMethod("getHandle");
+            Object serverPlayer = getHandle.invoke(player);
+            if (serverPlayer == null) return null;
+
+            for (Class<?> spClass = serverPlayer.getClass(); spClass != null && spClass != Object.class; spClass = spClass.getSuperclass()) {
+                for (Field connField : spClass.getDeclaredFields()) {
+                    connField.setAccessible(true);
+                    Object conn = connField.get(serverPlayer);
+                    if (conn == null) continue;
+                    String connType = conn.getClass().getSimpleName();
+                    if (!connType.contains("PacketListener") && !connType.contains("PlayerConnection")) continue;
+
+                    Channel direct = findChannelField(conn, connField, null, getHandle);
+                    if (direct != null) return direct;
+
+                    for (Class<?> cCls = conn.getClass(); cCls != null && cCls != Object.class; cCls = cCls.getSuperclass()) {
+                        for (Field netField : cCls.getDeclaredFields()) {
+                            netField.setAccessible(true);
+                            Object netObj = netField.get(conn);
+                            if (netObj == null || netObj instanceof String || netObj instanceof Number || netObj instanceof Boolean) {
+                                continue;
+                            }
+                            Channel nested = findChannelField(netObj, connField, netField, getHandle);
+                            if (nested != null) return nested;
                         }
                     }
                 }
             }
         } catch (Throwable ignored) {}
+        return null;
+    }
+
+    private Channel findChannelField(Object holder, Field connField, Field netField, Method getHandle) throws IllegalAccessException {
+        for (Class<?> hCls = holder.getClass(); hCls != null && hCls != Object.class; hCls = hCls.getSuperclass()) {
+            for (Field chField : hCls.getDeclaredFields()) {
+                if (Channel.class.isAssignableFrom(chField.getType())) {
+                    chField.setAccessible(true);
+                    Object val = chField.get(holder);
+                    if (val instanceof Channel channel) {
+                        this.cachedGetHandle = getHandle;
+                        this.cachedConnectionField = connField;
+                        this.cachedNetworkManagerField = netField;
+                        this.cachedChannelField = chField;
+                        return channel;
+                    }
+                }
+            }
+        }
         return null;
     }
 }

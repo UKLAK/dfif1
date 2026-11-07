@@ -6,10 +6,6 @@ import java.net.URLClassLoader;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * ClassLoader nạp các class động được biên dịch trong bộ nhớ hoặc từ thư mục.
- * Kế thừa trực tiếp từ classloader của server để có thể truy cập toàn bộ API Bukkit / Paper / Spigot.
- */
 public class DynamicClassLoader extends URLClassLoader {
 
     private final Map<String, byte[]> extraClassBytes = new ConcurrentHashMap<>();

@@ -13,11 +13,6 @@ import org.bukkit.persistence.PersistentDataType;
 
 import java.util.*;
 
-/**
- * Trình tạo Item tùy biến nâng cao (ItemBuilder & PDC API).
- * Cho phép thiết lập tên màu, lore, hiệu ứng phát sáng (glow), custom model data
- * và lưu trữ dữ liệu vĩnh viễn NBT / PersistentDataContainer với cú pháp fluent cực ngắn.
- */
 public class ItemBuilder {
 
     private final ItemStack item;
@@ -132,6 +127,55 @@ public class ItemBuilder {
         return this;
     }
 
+    public ItemBuilder maxStackSize(int maxStackSize) {
+        if (meta != null) {
+            ComponentItemHelper.setMaxStackSize(meta, maxStackSize);
+        }
+        return this;
+    }
+
+    public ItemBuilder rarity(String rarityName) {
+        if (meta != null) {
+            ComponentItemHelper.setRarity(meta, rarityName);
+        }
+        return this;
+    }
+
+    public ItemBuilder fireResistant(boolean fireResistant) {
+        if (meta != null) {
+            ComponentItemHelper.setFireResistant(meta, fireResistant);
+        }
+        return this;
+    }
+
+    public ItemBuilder hideTooltip(boolean hideTooltip) {
+        if (meta != null) {
+            ComponentItemHelper.setHideTooltip(meta, hideTooltip);
+        }
+        return this;
+    }
+
+    public ItemBuilder glintOverride(Boolean glint) {
+        if (meta != null) {
+            ComponentItemHelper.setGlintOverride(meta, glint);
+        }
+        return this;
+    }
+
+    public ItemBuilder baseItemName(String baseName) {
+        if (meta != null) {
+            ComponentItemHelper.setItemName(meta, baseName);
+        }
+        return this;
+    }
+
+    public ItemBuilder food(int nutrition, float saturation, boolean canAlwaysEat) {
+        if (meta != null) {
+            ComponentItemHelper.setFood(meta, nutrition, saturation, canAlwaysEat);
+        }
+        return this;
+    }
+
     public ItemBuilder enchant(Enchantment ench, int level) {
         if (meta != null && ench != null) {
             meta.addEnchant(ench, level, true);
@@ -153,9 +197,6 @@ public class ItemBuilder {
         return this;
     }
 
-    // ==========================================
-    // PERSISTENT DATA CONTAINER (PDC / NBT)
-    // ==========================================
 
     private NamespacedKey getKey(String key) {
         JavaStudioPlugin plugin = JavaStudioPlugin.getInstance();
@@ -192,9 +233,6 @@ public class ItemBuilder {
         return this;
     }
 
-    /**
-     * Gắn kỹ năng đặc biệt (ItemAbility) vào vật phẩm qua PDC.
-     */
     public ItemBuilder ability(String abilityId) {
         if (meta != null && abilityId != null && !abilityId.trim().isEmpty()) {
             try {

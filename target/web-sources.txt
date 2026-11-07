@@ -1,0 +1,4 @@
+C:\Users\ADMIN\Desktop\idm1\web-extension\src\main\java\com\javastudio\web\AcWebDashboard.java
+C:\Users\ADMIN\Desktop\idm1\web-extension\src\main\java\com\javastudio\web\JavaStudioWebPlugin.java
+C:\Users\ADMIN\Desktop\idm1\web-extension\src\main\java\com\javastudio\web\WebExtensionBootstrap.java
+C:\Users\ADMIN\Desktop\idm1\web-extension\src\main\java\com\javastudio\web\WebExtensionController.java

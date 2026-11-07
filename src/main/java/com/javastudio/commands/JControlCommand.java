@@ -16,11 +16,6 @@ import java.io.File;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * Lệnh quản trị cấp cao /jcontrol (alias: /jpm, /plugman, /jserver)
- * cho phép kiểm soát 100% mọi plugin trên server (bật/tắt/nạp/gỡ/reload)
- * và điều khiển hiệu năng, thế giới, tài nguyên của toàn bộ phần mềm máy chủ.
- */
 public class JControlCommand implements CommandExecutor, TabCompleter {
 
     private final JavaStudioPlugin plugin;
@@ -57,7 +52,6 @@ public class JControlCommand implements CommandExecutor, TabCompleter {
 
         String sub = args[0].toLowerCase();
 
-        // Kiểm tra phân quyền module
         boolean isServerOp = sub.equals("status") || sub.equals("gc") || sub.equals("purge") || sub.equals("save") || sub.equals("cmd");
         if (isServerOp && !plugin.getSettingsManager().isServerMonitorEnabled()) {
             MessageUtil.sendError(sender, "Tính năng Server Monitor (/jserver) đang bị tắt trong cài đặt!");

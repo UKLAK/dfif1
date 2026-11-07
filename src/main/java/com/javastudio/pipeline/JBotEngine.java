@@ -16,11 +16,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
-/**
- * JBotEngine: Hệ thống tạo Fake Player ở tầng Netty Channel (EmbeddedChannel)
- * và NMS ServerPlayer để kiểm thử tải (Stress-test), kiểm tra va chạm,
- * chạy benchmark Anti-Cheat (/jac) mà không cần client thật.
- */
 public final class JBotEngine {
 
     private final Plugin plugin;
@@ -33,7 +28,6 @@ public final class JBotEngine {
     }
 
     private void startGlobalTick() {
-        // Vòng lặp tick duy trì hoạt động cho tất cả các bot đang online
         globalTickTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             for (SimulatedBot bot : activeBots.values()) {
                 bot.tick();
@@ -50,9 +44,6 @@ public final class JBotEngine {
         }
     }
 
-    // =========================================================================
-    // I. ĐIỀU KHIỂN SPAWN / REMOVE BOT
-    // =========================================================================
 
     public SimulatedBot spawnBot(String name, Location spawnLoc, BotBehavior initialBehavior) {
         if (activeBots.containsKey(name.toLowerCase(Locale.ROOT))) {
@@ -94,15 +85,12 @@ public final class JBotEngine {
         return activeBots.get(name.toLowerCase(Locale.ROOT));
     }
 
-    // =========================================================================
-    // II. LỚP ĐẠI DIỆN CHO MỘT SIMULATED BOT (FAKE PLAYER)
-    // =========================================================================
 
     public enum BotBehavior {
-        IDLE,       // Đứng yên
-        WANDER,     // Di chuyển ngẫu nhiên quanh điểm spawn
-        COMBAT,     // Liên tục vung tay tấn công (test KillAura / Anti-Cheat)
-        SPAM_CHAT   // Gửi tin nhắn liên tục (test Exploit / Chat Filter)
+        IDLE,
+        WANDER,
+        COMBAT,
+        SPAM_CHAT
     }
 
     public static final class SimulatedBot {
@@ -130,7 +118,6 @@ public final class JBotEngine {
             if (world == null) {
                 throw new IllegalStateException("World không hợp lệ cho điểm spawn của bot: " + name);
             }
-            // Sử dụng Reflection để khởi tạo NMS ServerPlayer và Netty EmbeddedChannel mà không cần client thật
             MinecraftReflection.setupBotPlayer(this, world);
         }
 
@@ -158,7 +145,7 @@ public final class JBotEngine {
             ThreadLocalRandom rand = ThreadLocalRandom.current();
             switch (behavior) {
                 case WANDER -> {
-                    if (tickCount % 20 == 0) { // Mỗi giây đổi hướng một lần
+                    if (tickCount % 20 == 0) {
                         yaw += (rand.nextFloat() - 0.5f) * 90f;
                         double rad = Math.toRadians(yaw);
                         double nx = location.getX() - Math.sin(rad) * 0.5;
@@ -171,7 +158,7 @@ public final class JBotEngine {
                     }
                 }
                 case COMBAT -> {
-                    if (tickCount % 10 == 0) { // Mỗi 0.5s vung tay tấn công
+                    if (tickCount % 10 == 0) {
                         yaw += 15f;
                         location.setYaw(yaw);
                         MinecraftReflection.sendArmAnimation(this);
@@ -216,33 +203,25 @@ public final class JBotEngine {
         public void setChannel(EmbeddedChannel ch) { this.channel = ch; }
     }
 
-    // =========================================================================
-    // III. CẦU NỐI REFLECTION NMS (TƯƠNG THÍCH ĐA PHIÊN BẢN 1.20.5 - 26.3+)
-    // =========================================================================
 
     private static final class MinecraftReflection {
         private static Object lastCreatedCookie = null;
 
         static void setupBotPlayer(SimulatedBot bot, World world) throws Exception {
-            // Khởi tạo kênh Netty giả lập
             EmbeddedChannel channel = new EmbeddedChannel();
             bot.setChannel(channel);
 
-            // Truy xuất NMS Server / MinecraftServer
             Class<?> craftServerClass = Bukkit.getServer().getClass();
             Method getServerMethod = craftServerClass.getMethod("getServer");
             Object nmsServer = getServerMethod.invoke(Bukkit.getServer());
 
-            // Truy xuất ServerLevel
             Method getHandleWorld = world.getClass().getMethod("getHandle");
             Object serverLevel = getHandleWorld.invoke(world);
 
-            // Khởi tạo GameProfile
             Class<?> gameProfileClass = Class.forName("com.mojang.authlib.GameProfile");
             Constructor<?> gpConstructor = gameProfileClass.getConstructor(UUID.class, String.class);
             Object gameProfile = gpConstructor.newInstance(UUID.randomUUID(), bot.getName());
 
-            // Khởi tạo ServerPlayer
             Class<?> serverPlayerClass = Class.forName("net.minecraft.server.level.ServerPlayer");
             Constructor<?> spConstructor = null;
             for (Constructor<?> c : serverPlayerClass.getDeclaredConstructors()) {
@@ -285,10 +264,9 @@ public final class JBotEngine {
             }
             bot.setNetServerPlayer(serverPlayer);
 
-            // Khởi tạo Connection
             Class<?> connectionClass = Class.forName("net.minecraft.network.Connection");
             Class<?> packetFlowClass = Class.forName("net.minecraft.network.protocol.PacketFlow");
-            Object serverboundEnum = packetFlowClass.getEnumConstants()[1]; // SERVERBOUND
+            Object serverboundEnum = packetFlowClass.getEnumConstants()[1];
 
             Object connection = null;
             for (Constructor<?> connConstr : connectionClass.getConstructors()) {
@@ -303,7 +281,6 @@ public final class JBotEngine {
                 connection = defaultConn.newInstance();
             }
 
-            // Khởi tạo ServerGamePacketListenerImpl
             Class<?> packetListenerClass = Class.forName("net.minecraft.server.network.ServerGamePacketListenerImpl");
             Constructor<?> plConstructor = null;
             for (Constructor<?> c : packetListenerClass.getDeclaredConstructors()) {
@@ -328,7 +305,6 @@ public final class JBotEngine {
                     packetListener = plConstructor.newInstance(nmsServer, connection, serverPlayer);
                 }
 
-                // Gán connection field vào serverPlayer nếu tồn tại
                 try {
                     Field connectionField = null;
                     for (Field f : serverPlayerClass.getDeclaredFields()) {
@@ -344,7 +320,6 @@ public final class JBotEngine {
                 } catch (Exception ignored) {}
             }
 
-            // Lấy CraftPlayer tương ứng
             Method getBukkitEntity = serverPlayerClass.getMethod("getBukkitEntity");
             Object cp = getBukkitEntity.invoke(serverPlayer);
             bot.setCraftPlayer(cp);

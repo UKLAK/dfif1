@@ -11,30 +11,18 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
-/**
- * AutoMitigationEngine: Hệ thống Vận hành Tự động Ứng cứu Quá tải
- * Mặc định TẮT (disabled), chỉ kích hoạt khi bật trong setting.
- * Tự động phát hiện khi máy chủ bị nghẽn (MSPT vượt ngưỡng hoặc TPS tụt)
- * và kích hoạt các kịch bản ứng cứu theo cấu hình:
- * 1. Dọn dẹp thực thể rơi rớt và quái vật thù địch ở các thế giới tải nặng.
- * 2. Tạm thời giảm view-distance & simulation-distance để hạ nhiệt CPU.
- * 3. Tự động phục hồi nguyên trạng khi TPS & MSPT ổn định trở lại.
- * Toàn bộ thông số có thể điều chỉnh chi tiết trong config.yml và qua lệnh /jdiag.
- */
 public final class AutoMitigationEngine {
 
     private final JavaStudioPlugin plugin;
     private final Logger logger;
     private final ServerController serverController;
 
-    // Cấu hình hoạt động (mặc định tắt)
     private boolean enabled = false;
-    private double msptThreshold = 45.0; // ms
+    private double msptThreshold = 45.0;
     private double tpsThreshold = 16.5;
     private int requiredLagSeconds = 10;
     private int requiredRecoverySeconds = 15;
 
-    // Các kịch bản ứng cứu có thể cấu hình
     private boolean purgeEntitiesEnabled = true;
     private boolean triggerGcEnabled = true;
     private boolean scaleViewDistanceEnabled = true;
@@ -48,7 +36,6 @@ public final class AutoMitigationEngine {
     private int continuousHealthyTicks = 0;
     private boolean currentlyMitigating = false;
 
-    // Lưu trữ cấu hình gốc trước khi giảm tải để khôi phục
     private final Map<String, Integer> originalViewDistances = new ConcurrentHashMap<>();
     private final Map<String, Integer> originalSimDistances = new ConcurrentHashMap<>();
     private int totalMitigationsTriggered = 0;
@@ -61,12 +48,8 @@ public final class AutoMitigationEngine {
         loadConfig();
     }
 
-    /**
-     * Nạp cấu hình từ config.yml. Mặc định enabled là false.
-     */
     public final synchronized void loadConfig() {
         FileConfiguration config = plugin.getConfig();
-        // Mặc định TẮT, chỉ bật nếu người dùng cấu hình rõ ràng
         this.enabled = config.getBoolean("auto-mitigation.enabled", false);
         this.msptThreshold = config.getDouble("auto-mitigation.mspt-threshold", 45.0);
         this.tpsThreshold = config.getDouble("auto-mitigation.tps-threshold", 16.5);
@@ -81,9 +64,6 @@ public final class AutoMitigationEngine {
         this.minSimDistance = config.getInt("auto-mitigation.min-sim-distance", 3);
     }
 
-    /**
-     * Lưu cấu hình hiện tại vào config.yml.
-     */
     public synchronized void saveConfig() {
         FileConfiguration config = plugin.getConfig();
         config.set("auto-mitigation.enabled", this.enabled);
@@ -104,7 +84,7 @@ public final class AutoMitigationEngine {
     public synchronized void start() {
         if (!enabled || monitorTask != null) return;
 
-        monitorTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 20L, 20L); // Chạy mỗi 1 giây
+        monitorTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 20L, 20L);
         logger.info("[AutoMitigation] Đã kích hoạt hệ thống tự động ứng cứu khi server quá tải (MSPT > "
                 + msptThreshold + "ms, TPS < " + tpsThreshold + ")!");
     }
@@ -144,9 +124,6 @@ public final class AutoMitigationEngine {
         }
     }
 
-    /**
-     * Kích hoạt quy trình giảm tải khẩn cấp.
-     */
     public synchronized void triggerMitigation(String cause) {
         if (currentlyMitigating) return;
         currentlyMitigating = true;
@@ -158,18 +135,15 @@ public final class AutoMitigationEngine {
         logger.warning("[AutoMitigation] Đang tự động kích hoạt các biện pháp hạ nhiệt CPU...");
         logger.warning("==================================================");
 
-        // Bước 1: Dọn dẹp thực thể rơi rớt và quái vật trên toàn bộ thế giới nếu bật
         if (purgeEntitiesEnabled) {
             int purged = serverController.purgeEntities(null, true, true, false);
             logger.info("[AutoMitigation] Bước 1: Đã dọn dẹp " + purged + " thực thể rác/quái vật gây lag.");
         }
 
-        // Bước 2: Tự động thu gom rác bộ nhớ JVM nếu bật
         if (triggerGcEnabled) {
             serverController.triggerGC();
         }
 
-        // Bước 3: Giảm view-distance và simulation-distance tạm thời nếu bật
         if (scaleViewDistanceEnabled) {
             for (World world : Bukkit.getWorlds()) {
                 try {
@@ -189,7 +163,6 @@ public final class AutoMitigationEngine {
             }
         }
 
-        // Bước 4: Dọn dẹp Zombie Sessions và giải phóng tài nguyên Web Panel
         if (plugin.getPanelCveProtection() != null) {
             int purgedSessions = plugin.getPanelCveProtection().getSessionRevocationManager().purgeIdleZombieSessions();
             if (purgedSessions > 0) {
@@ -197,15 +170,11 @@ public final class AutoMitigationEngine {
             }
         }
 
-        // Bước 5: Gửi cảnh báo Discord Webhook nếu cấu hình
         if (plugin.getDiscordWebhook() != null) {
             plugin.getDiscordWebhook().sendEmbed("Auto-Mitigation Activated", "Server overload detected (" + cause + "). Ground items purged, sessions reaped and view distance scaled down.", 0xFF5555, null);
         }
     }
 
-    /**
-     * Khôi phục cài đặt gốc khi server đã ổn định.
-     */
     public synchronized void restoreOriginalSettings() {
         if (!currentlyMitigating) return;
         currentlyMitigating = false;

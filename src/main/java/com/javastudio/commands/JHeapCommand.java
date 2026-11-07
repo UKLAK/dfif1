@@ -12,9 +12,6 @@ import org.bukkit.plugin.Plugin;
 
 import java.util.*;
 
-/**
- * Lệnh thanh tra cây đối tượng và bộ nhớ JVM thời gian thực (/jheap, /jmem).
- */
 public class JHeapCommand implements CommandExecutor, TabCompleter {
 
     private final JavaStudioPlugin plugin;

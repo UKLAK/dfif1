@@ -12,11 +12,6 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 import java.util.jar.Manifest;
 
-/**
- * Đóng gói và xuất Dynamic Plugin thành file JAR độc lập (Standalone Plugin).
- * File JAR tạo ra có thể cài vào bất kỳ server Bukkit/Paper/Purpur/Spigot nào
- * mà KHÔNG cần cài JavaStudio.
- */
 public class PluginExporter {
 
     private final JavaStudioPlugin hostPlugin;
@@ -30,26 +25,10 @@ public class PluginExporter {
         }
     }
 
-    /**
-     * Xuất một dự án Dynamic Plugin thành file .jar
-     *
-     * @param projectName Tên dự án cần xuất
-     * @param errorLog    Ghi nhận lỗi nếu có
-     * @return File JAR đã xuất nếu thành công, null nếu thất bại
-     */
     public File exportProject(String projectName, StringBuilder errorLog) {
         return exportProject(projectName, false, null, errorLog);
     }
 
-    /**
-     * Xuất một dự án Dynamic Plugin thành file .jar độc lập kèm tùy chọn bảo vệ mã nguồn.
-     *
-     * @param projectName Tên dự án cần xuất
-     * @param obfuscate   Bật làm rối Bytecode và xóa debug symbols
-     * @param licenseKey  Mã khóa bản quyền (nếu có)
-     * @param errorLog    Ghi nhận lỗi nếu có
-     * @return File JAR đã xuất nếu thành công, null nếu thất bại
-     */
     public File exportProject(String projectName, boolean obfuscate, String licenseKey, StringBuilder errorLog) {
         File projectDir = new File(hostPlugin.getPluginManager().getProjectsFolder(), projectName);
         if (!projectDir.exists()) {
@@ -75,7 +54,6 @@ public class PluginExporter {
             return null;
         }
 
-        // 1. Biên dịch dự án
         CompileResult compileResult = hostPlugin.getPluginManager().compileProject(projectName);
         if (compileResult == null || !compileResult.isSuccess()) {
             if (errorLog != null) {
@@ -86,13 +64,11 @@ public class PluginExporter {
 
         File outputJar = new File(exportsFolder, name + "-" + version + ".jar");
 
-        // 2. Tạo file JAR
         Manifest manifest = new Manifest();
         manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
         manifest.getMainAttributes().put(new Attributes.Name("Created-By"), "JavaStudio Exporter" + (obfuscate ? " (Protected)" : ""));
 
         try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(outputJar), manifest)) {
-            // Thêm các class đã biên dịch của dynamic plugin (làm rối nếu bật obfuscate)
             for (Map.Entry<String, byte[]> entry : compileResult.getByteCodes().entrySet()) {
                 String entryPath = entry.getKey().replace('.', '/') + ".class";
                 jos.putNextEntry(new JarEntry(entryPath));
@@ -104,7 +80,6 @@ public class PluginExporter {
                 jos.closeEntry();
             }
 
-            // Nhúng các class phụ trợ cơ sở từ host plugin để standalone plugin tự chủ 100%
             String[] coreRuntimeClasses = {
                 "com/javastudio/export/StandaloneBootstrap.class",
                 "com/javastudio/export/LicenseManager.class",
@@ -132,7 +107,6 @@ public class PluginExporter {
                 embedClass(jos, cls);
             }
 
-            // Tạo file plugin.yml tiêu chuẩn của Bukkit
             String pluginYmlContent = """
                     name: %NAME%
                     version: '%VERSION%'
@@ -151,13 +125,11 @@ public class PluginExporter {
             jos.write(pluginYmlContent.getBytes(StandardCharsets.UTF_8));
             jos.closeEntry();
 
-            // Tạo file javastudio_meta.yml để StandaloneBootstrap nhận diện mainClass
             String metaContent = "main: " + mainClass + "\nname: " + name + "\nversion: " + version + "\n";
             jos.putNextEntry(new JarEntry("javastudio_meta.yml"));
             jos.write(metaContent.getBytes(StandardCharsets.UTF_8));
             jos.closeEntry();
 
-            // Gắn khóa bản quyền & Thủy vân Anti-Leak nếu có
             if (licenseKey != null && !licenseKey.trim().isEmpty()) {
                 jos.putNextEntry(new JarEntry("javastudio_license.key"));
                 jos.write(licenseKey.trim().getBytes(StandardCharsets.UTF_8));
@@ -173,7 +145,6 @@ public class PluginExporter {
                 }
             }
 
-            // Sao chép config.yml từ thư mục data nếu có
             File configFile = new File(projectDir, "data" + File.separator + "config.yml");
             if (configFile.exists()) {
                 jos.putNextEntry(new JarEntry("config.yml"));

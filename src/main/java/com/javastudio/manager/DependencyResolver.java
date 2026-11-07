@@ -10,10 +10,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
 
-/**
- * Trình tải và phân giải thư viện phụ thuộc từ Maven Central thời gian thực.
- * Cho phép Dynamic Plugin sử dụng bất kỳ thư viện Java nào từ kho lưu trữ Maven.
- */
 public class DependencyResolver {
 
     private static final String MAVEN_CENTRAL = "https://repo1.maven.org/maven2/";
@@ -30,12 +26,6 @@ public class DependencyResolver {
         }
     }
 
-    /**
-     * Phân giải và tải về danh sách các Maven coordinates (dạng "groupId:artifactId:version")
-     *
-     * @param coordinates Danh sách tọa độ Maven (ví dụ: "com.squareup.okhttp3:okhttp:4.12.0")
-     * @return Danh sách các file JAR đã tải về và sẵn sàng nạp vào ClassLoader
-     */
     public List<File> resolveDependencies(List<String> coordinates) {
         List<File> resolvedFiles = new ArrayList<>();
         if (coordinates == null || coordinates.isEmpty()) {
@@ -55,9 +45,6 @@ public class DependencyResolver {
         return resolvedFiles;
     }
 
-    /**
-     * Tải về 1 dependency Maven cụ thể.
-     */
     public File resolveSingleDependency(String coordinate) {
         String[] parts = coordinate.split(":");
         if (parts.length < 3) {

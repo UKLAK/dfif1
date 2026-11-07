@@ -14,11 +14,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 
-/**
- * Trình điều phối Redis phân tán (Redis Distributed Sync Engine) với Zero External Dependencies.
- * Tự thực thi giao thức mạng Redis RESP thuần túy qua Socket Java, hỗ trợ Pub/Sub đồng bộ
- * xuyên mạng đa cụm server (Velocity/BungeeCord) và làm bộ nhớ cache Key-Value siêu tốc.
- */
 public class RedisSyncManager {
 
     private final JavaStudioPlugin plugin;
@@ -55,7 +50,6 @@ public class RedisSyncManager {
                 readResp(commandIn);
             }
 
-            // Test Ping
             sendRawCommand(commandOut, "PING");
             String pingResp = readResp(commandIn);
             if (!"PONG".equalsIgnoreCase(pingResp)) {
@@ -65,10 +59,8 @@ public class RedisSyncManager {
             running.set(true);
             plugin.getLogger().info("[RedisSync] Kết nối Redis Server thành công tại " + host + ":" + port + "!");
 
-            // Bật luồng lắng nghe Subscriber cho kênh đồng bộ
             startSubscriberThread();
 
-            // Đăng ký kênh mặc định
             subscribe("javastudio:sync", this::handleSyncMessage);
 
             return true;
@@ -164,7 +156,6 @@ public class RedisSyncManager {
 
     private void handleSyncMessage(String msg) {
         plugin.getLogger().info("[RedisSync] Nhận thông điệp đồng bộ mạng: " + msg);
-        // Format: ACTION:::NAME:::PAYLOAD
         String[] parts = msg.split(":::", 3);
         if (parts.length >= 2) {
             String action = parts[0];
@@ -251,12 +242,11 @@ public class RedisSyncManager {
                 if (r == -1) break;
                 read += r;
             }
-            readLine(is); // Bỏ qua \r\n kết thúc
+            readLine(is);
             return new String(data, StandardCharsets.UTF_8);
         } else if (type == '*') {
             int count = Integer.parseInt(readLine(is));
             if (count == -1) return null;
-            // Trả về phần tử đầu tiên nếu là array
             if (count > 0) {
                 return readResp(is);
             }
@@ -287,7 +277,7 @@ public class RedisSyncManager {
         int b;
         while ((b = is.read()) != -1) {
             if (b == '\r') {
-                is.read(); // Bỏ qua \n
+                is.read();
                 break;
             }
             sb.append((char) b);

@@ -18,13 +18,6 @@ import org.bukkit.scoreboard.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Engine hiển thị nâng cao tích hợp sẵn trong JavaStudio:
- * - Holograms (Chữ nổi 3D bằng Text Display Entity chuẩn Minecraft 1.20+ hoặc ArmorStand)
- * - Scoreboard (Bảng điểm động hiển thị bên phải màn hình)
- * - BossBar (Thanh máu sự kiện tùy biến đa sắc màu)
- * - Tích hợp PlaceholderAPI (PAPI) tự động nếu có sẵn.
- */
 public class DisplayEngine {
 
     private final JavaStudioPlugin plugin;
@@ -37,13 +30,7 @@ public class DisplayEngine {
         initPlaceholderApiHook();
     }
 
-    // ==========================================
-    // 1. HOLOGRAMS ENGINE (TEXT DISPLAY 1.20+)
-    // ==========================================
 
-    /**
-     * Tạo chữ nổi (Hologram) tại vị trí chỉ định.
-     */
     @SuppressWarnings("deprecation")
     public List<Entity> createHologram(Location location, String... lines) {
         if (location == null || location.getWorld() == null || lines == null || lines.length == 0) {
@@ -56,7 +43,6 @@ public class DisplayEngine {
         for (String rawLine : lines) {
             String colored = MessageUtil.color(rawLine);
             try {
-                // Sử dụng TextDisplay của Minecraft 1.20+ (không lag, mượt mà, hỗ trợ billboard)
                 TextDisplay display = (TextDisplay) location.getWorld().spawnEntity(currentLoc, EntityType.TEXT_DISPLAY);
                 display.setText(colored);
                 display.setBillboard(TextDisplay.Billboard.CENTER);
@@ -65,7 +51,6 @@ public class DisplayEngine {
                 display.setCustomNameVisible(true);
                 created.add(display);
             } catch (Throwable fallback) {
-                // Fallback nếu chạy trên phiên bản cũ hơn
                 try {
                     Entity as = location.getWorld().spawnEntity(currentLoc, EntityType.ARMOR_STAND);
                     as.setCustomName(colored);
@@ -83,9 +68,6 @@ public class DisplayEngine {
         return created;
     }
 
-    /**
-     * Xóa sạch các Hologram trong bán kính gần vị trí.
-     */
     public int clearHologramsNear(Location loc, double radius) {
         if (loc == null || loc.getWorld() == null) return 0;
         int count = 0;
@@ -115,13 +97,7 @@ public class DisplayEngine {
         activeHolograms.clear();
     }
 
-    // ==========================================
-    // 2. SCOREBOARD ENGINE
-    // ==========================================
 
-    /**
-     * Tạo hoặc cập nhật Scoreboard động bên phải màn hình cho người chơi.
-     */
     @SuppressWarnings("deprecation")
     public void setScoreboard(Player player, String title, String... lines) {
         if (player == null || !player.isOnline()) return;
@@ -142,7 +118,6 @@ public class DisplayEngine {
             int score = lines.length;
             for (int i = 0; i < lines.length; i++) {
                 String line = MessageUtil.color(lines[i]);
-                // Tránh lỗi trùng lặp text trong scoreboard của Minecraft
                 if (line.isEmpty()) line = ChatColor.values()[i % ChatColor.values().length].toString();
                 obj.getScore(line).setScore(score--);
             }
@@ -160,13 +135,7 @@ public class DisplayEngine {
         customScoreboards.remove(player.getUniqueId());
     }
 
-    // ==========================================
-    // 3. BOSSBAR ENGINE
-    // ==========================================
 
-    /**
-     * Tạo hoặc cập nhật BossBar phía trên màn hình người chơi.
-     */
     public BossBar showBossBar(Player player, String title, double progress, String colorStr, String styleStr) {
         if (player == null || !player.isOnline()) return null;
 
@@ -205,13 +174,7 @@ public class DisplayEngine {
         customScoreboards.clear();
     }
 
-    // ==========================================
-    // 4. 3D VISUAL DEBUG GIZMOS (PARTICLE TRACER)
-    // ==========================================
 
-    /**
-     * Vẽ tia RayTrace dạng hạt particle từ điểm A tới điểm B (Dùng test đạn, tầm nhìn, skill).
-     */
     public void drawRay(Location from, Location to, Particle particle, double step) {
         if (from == null || to == null || from.getWorld() == null || !from.getWorld().equals(to.getWorld())) return;
         org.bukkit.util.Vector direction = to.toVector().subtract(from.toVector());
@@ -238,9 +201,6 @@ public class DisplayEngine {
         }
     }
 
-    /**
-     * Vẽ hình cầu (Sphere) dạng hạt particle quanh vị trí (Dùng test bán kính nổ, aura).
-     */
     public void drawSphere(Location center, double radius, Particle particle, int points) {
         if (center == null || center.getWorld() == null) return;
         int pts = Math.max(8, points);
@@ -255,9 +215,6 @@ public class DisplayEngine {
         }
     }
 
-    /**
-     * Vẽ vòng tròn nằm ngang (Circle) quanh vị trí.
-     */
     public void drawCircle(Location center, double radius, Particle particle, int points) {
         if (center == null || center.getWorld() == null) return;
         int pts = Math.max(8, points);
@@ -271,9 +228,6 @@ public class DisplayEngine {
         }
     }
 
-    // ==========================================
-    // 5. PLACEHOLDERAPI BRIDGE
-    // ==========================================
 
     private void initPlaceholderApiHook() {
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {

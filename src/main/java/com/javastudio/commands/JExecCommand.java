@@ -21,9 +21,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Lệnh /jexec và /java cho phép thực thi trực tiếp các câu lệnh Java từ chat Minecraft hoặc Console.
- */
 public class JExecCommand implements CommandExecutor, TabCompleter {
 
     private final JavaStudioPlugin plugin;
@@ -140,7 +137,6 @@ public class JExecCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        // Tự động nhận diện nếu tham số bắt đầu bằng @file hoặc là tên 1 file có trong thư mục scripts/
         if (fileName == null && startIndex < args.length) {
             String candidate = args[startIndex];
             if (candidate.startsWith("@")) {
@@ -204,7 +200,6 @@ public class JExecCommand implements CommandExecutor, TabCompleter {
     private void executeJava(CommandSender sender, String rawCode, boolean measureTime, String[] scriptArgs) {
         long startNano = System.nanoTime();
 
-        // 1. Kiểm tra qua Security Sandbox
         String violation = plugin.getSecuritySandbox().validateCode(rawCode);
         if (violation != null) {
             MessageUtil.sendError(sender, violation);
@@ -232,7 +227,6 @@ public class JExecCommand implements CommandExecutor, TabCompleter {
         String sourceCode = buildClassSource(className, rawCode);
 
         CompileResult result = plugin.getCompiler().compileSingleSource(fullClassPath, sourceCode);
-        // Tự động nhận diện và sửa lỗi nếu biểu thức là hàm void (không trả về giá trị)
         if (!result.isSuccess() && !cleanCode.contains("class ") && result.getFormattedErrors().contains("'void' type not allowed")) {
             sourceCode = buildClassSource(className, rawCode + ";\n        return null;");
             result = plugin.getCompiler().compileSingleSource(fullClassPath, sourceCode);
@@ -284,7 +278,6 @@ public class JExecCommand implements CommandExecutor, TabCompleter {
     private String buildClassSource(String className, String userCode) {
         String cleanCode = userCode.trim();
 
-        // Nếu mã nguồn người dùng đã tự định nghĩa một class Java hoàn chỉnh
         if (cleanCode.contains("class ") && cleanCode.contains("{")) {
             if (!cleanCode.contains("package ")) {
                 return "package com.javastudio.runtime;\n\n" +
@@ -346,10 +339,13 @@ public class JExecCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return Arrays.asList("-a", "-t", "-f", "heal()", "give(\"diamond\", 64)", "day()", "tp(0, 100, 0)", "lightning()", "spawn(\"zombie\", 3)", "nearby(10)", "top()", "god()", "fly()");
+            List<String> list = Arrays.asList("-a", "-t", "-f", "repl", "list", "kill", "heal()", "feed()", "god()", "fly()", "day()", "night()", "give(\"diamond\", 64)", "tp(0, 100, 0)", "lightning()", "spawn(\"zombie\", 3)", "nearby(10)", "fastBlock()", "gui(\"Menu\", 3)", "item(Material.DIAMOND_SWORD)", "ecoBalance()", "ecoDeposit(1000)");
+            String prefix = args[0].toLowerCase();
+            return list.stream().filter(s -> s.toLowerCase().startsWith(prefix)).toList();
         }
         if (args.length == 2 && (args[0].equalsIgnoreCase("-f") || args[0].equalsIgnoreCase("--file"))) {
-            return plugin.getScriptManager().getAvailableScripts();
+            String prefix = args[1].toLowerCase();
+            return plugin.getScriptManager().getAvailableScripts().stream().filter(s -> s.toLowerCase().startsWith(prefix)).toList();
         }
         return Collections.emptyList();
     }

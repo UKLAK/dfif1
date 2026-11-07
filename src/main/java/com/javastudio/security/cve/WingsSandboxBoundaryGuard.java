@@ -6,11 +6,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
 
-/**
- * Phòng thủ chống Wings Container Sandbox Escape & Symlink Traversal (CVE-2024-27102).
- * Đảm bảo các tiến trình, Dynamic Plugin và tệp tin trong máy chủ Minecraft không thể
- * vượt ra ngoài thư mục gốc sandbox (/home/container hoặc server root) để đọc file của Host hoặc server khác.
- */
 public final class WingsSandboxBoundaryGuard {
 
     private final PanelCveProtectionSuite suite;
@@ -26,16 +21,12 @@ public final class WingsSandboxBoundaryGuard {
         }
     }
 
-    /**
-     * Xác thực xem một tệp tin hoặc đường dẫn có nằm an toàn trong ranh giới Sandbox của Server hay không.
-     */
     public boolean verifySandboxBoundary(File file) {
         if (file == null) return false;
 
         try {
             Path filePath = file.toPath();
 
-            // 1. Kiểm tra Symbolic Link độc hại trỏ ra ngoài Sandbox
             if (Files.isSymbolicLink(filePath)) {
                 Path realTarget = filePath.toRealPath();
                 File targetFile = realTarget.toFile();
@@ -48,7 +39,6 @@ public final class WingsSandboxBoundaryGuard {
                 }
             }
 
-            // 2. Kiểm tra Canonical Boundary
             File canonicalFile = file.getCanonicalFile();
             if (!PathTraversalDefense.isInsideSecure(serverRoot, canonicalFile)) {
                 suite.getStats().incrementCve2024_27102();
@@ -57,7 +47,6 @@ public final class WingsSandboxBoundaryGuard {
                 return false;
             }
 
-            // 3. Chặn các đường dẫn nhắm vào hệ thống Linux / Windows host
             String pathStr = canonicalFile.getAbsolutePath().toLowerCase(Locale.ROOT);
             if (pathStr.startsWith("/etc/") || pathStr.startsWith("/proc/") ||
                 pathStr.startsWith("/sys/") || pathStr.startsWith("/root/") ||

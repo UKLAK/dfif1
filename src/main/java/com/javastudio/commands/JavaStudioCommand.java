@@ -12,9 +12,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Lệnh chính /javastudio hiển thị thông tin hệ sinh thái, cấu hình và trạng thái.
- */
 public class JavaStudioCommand implements CommandExecutor, TabCompleter {
 
     private final JavaStudioPlugin plugin;
@@ -54,8 +51,12 @@ public class JavaStudioCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if (sub.equals("settings") || sub.equals("config") || sub.equals("modules")) {
-            showSettingsDashboard(sender);
+        if (sub.equals("settings") || sub.equals("config") || sub.equals("modules") || sub.equals("menu") || sub.equals("gui")) {
+            if (sender instanceof org.bukkit.entity.Player player && (args.length < 2 || !args[1].equalsIgnoreCase("text"))) {
+                openSettingsGui(player, 0);
+            } else {
+                showSettingsDashboard(sender);
+            }
             return true;
         }
 
@@ -136,6 +137,69 @@ public class JavaStudioCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private void openSettingsGui(org.bukkit.entity.Player player, int page) {
+        var sm = plugin.getSettingsManager();
+        var allModules = com.javastudio.manager.SettingsManager.ModuleKey.values();
+        int totalModules = allModules.length;
+        int pageSize = 45;
+        int maxPages = Math.max(1, (int) Math.ceil((double) totalModules / pageSize));
+        int curPage = Math.max(0, Math.min(page, maxPages - 1));
+
+        com.javastudio.api.gui.SmartGui gui = com.javastudio.api.gui.SmartGui.of("&8[Cài Đặt] &eModules (" + (curPage + 1) + "/" + maxPages + ")", 6);
+
+        int startIndex = curPage * pageSize;
+        int endIndex = Math.min(startIndex + pageSize, totalModules);
+
+        for (int i = startIndex; i < endIndex; i++) {
+            var mod = allModules[i];
+            int slot = i - startIndex;
+            boolean enabled = sm.isEnabled(mod);
+
+            org.bukkit.Material mat = enabled ? org.bukkit.Material.LIME_DYE : org.bukkit.Material.GRAY_DYE;
+            String name = (enabled ? "&a✔ &f" : "&c✖ &7") + mod.getDisplayName();
+            List<String> lore = new java.util.ArrayList<>();
+            lore.add("&7Khóa: &e" + mod.getKey());
+            lore.add("&7Trạng thái: " + (enabled ? "&a[ĐANG HOẠT ĐỘNG]" : "&c[ĐÃ TẮT - ĐANG NGHỈ]"));
+            lore.add("&7Mô tả: &f" + mod.getDescription());
+            if (!enabled) {
+                lore.add("&7Tiết kiệm: &3" + sm.getResourceSavings(mod));
+            }
+            lore.add("&8-----------------------------");
+            lore.add(enabled ? "&c👉 Nhấp chuột để TẮT module này" : "&a👉 Nhấp chuột để BẬT module này");
+
+            org.bukkit.inventory.ItemStack item = com.javastudio.api.item.ItemBuilder.of(mat)
+                    .name(name)
+                    .lore(lore)
+                    .build();
+
+            gui.setButton(slot, item, (p, event) -> {
+                boolean nextState = sm.toggleModule(mod);
+                p.playSound(p.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 1.0f, 1.2f);
+                MessageUtil.send(p, "&e[Settings] &fĐã " + (nextState ? "&aBẬT" : "&cTẮT") + " &fmodule: &b" + mod.getDisplayName());
+                openSettingsGui(p, curPage);
+            });
+        }
+
+        if (curPage > 0) {
+            gui.setButton(45, com.javastudio.api.item.ItemBuilder.of(org.bukkit.Material.ARROW)
+                    .name("&e◀ Trang trước")
+                    .build(), (p, ev) -> openSettingsGui(p, curPage - 1));
+        }
+
+        gui.setButton(49, com.javastudio.api.gui.GuiButton.of(com.javastudio.api.item.ItemBuilder.of(org.bukkit.Material.BOOK)
+                .name("&6&lTẤT CẢ PHÂN HỆ (" + (curPage + 1) + "/" + maxPages + ")")
+                .lore("&7Tổng cộng: &e" + totalModules + " modules", "&7Nhấp trực tiếp vào icon để Bật/Tắt tức thì!")
+                .build()));
+
+        if (curPage < maxPages - 1) {
+            gui.setButton(53, com.javastudio.api.item.ItemBuilder.of(org.bukkit.Material.ARROW)
+                    .name("&eTrang sau ▶")
+                    .build(), (p, ev) -> openSettingsGui(p, curPage + 1));
+        }
+
+        gui.open(player);
+    }
+
     private void showSettingsDashboard(CommandSender sender) {
         MessageUtil.send(sender, "&6=== Cài Đặt Hệ Thống JavaStudio (Settings) ===");
         MessageUtil.sendRaw(sender, "  &7Tắt những tính năng không dùng để giảm tải CPU, RAM & I/O mạng:");
@@ -157,7 +221,7 @@ public class JavaStudioCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return Arrays.asList("info", "settings", "toggle", "set", "watcher", "reload", "help");
+            return Arrays.asList("info", "settings", "menu", "gui", "toggle", "set", "watcher", "reload", "help");
         }
         if (args.length == 2 && (args[0].equalsIgnoreCase("toggle") || args[0].equalsIgnoreCase("set"))) {
             List<String> keys = new java.util.ArrayList<>();

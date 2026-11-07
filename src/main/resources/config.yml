@@ -128,6 +128,60 @@ modules:
   # Chẩn đoán hiệu năng tổng hợp & rò rỉ bộ nhớ ClassLoader (/jdiag)
   telemetry-nexus: true
 
+  # Mạng cụm phân tán P2P Mesh Network & Đồng thuận Raft (/jmesh)
+  # [Tiết kiệm]: Tắt nếu server chạy độc lập một cụm, không cần P2P discovery
+  cluster-mesh: true
+
+  # Đồng bộ kho đồ cụm không dupe đồ giữa các server (Zero-Dupe Inventory Sync)
+  inventory-sync: true
+
+  # Đo lường năng lực phần cứng, CPU, RAM, NVMe và chấm điểm server (/jbench)
+  server-benchmark: true
+
+  # Tự động phát hiện và giải tỏa bế tắc luồng (Deadlock Resolver)
+  # [Tiết kiệm]: Tắt nếu không cần giám sát deadlock ngầm định kỳ
+  deadlock-resolver: true
+
+  # Tải trước chunk bất đồng bộ theo vector di chuyển (/jprefetch)
+  # [Tiết kiệm]: Tắt nếu không muốn nạp trước chunk khi người chơi bay tốc độ cao
+  chunk-prefetcher: true
+
+  # Trình thiết kế giao diện Chest GUI kéo thả trong game (/jgui)
+  # [Tiết kiệm]: Tắt nếu không cần thiết kế menu trực quan
+  gui-designer: true
+
+  # Lập trình sơ đồ khối logic trực quan No-Code (/jflow)
+  # [Tiết kiệm]: Tắt nếu không dùng kịch bản visual flow trong thư mục flows/
+  visual-flow: true
+
+  # Time-Travel Snapshots & Rollback mã nguồn (/jgit)
+  # [Tiết kiệm]: Tắt nếu không muốn lưu các bản snapshot mã nguồn
+  snapshot-rollback: true
+
+  # Giả lập bắn sự kiện Bukkit in-game phục vụ kiểm thử (/jmock)
+  # [Tiết kiệm]: Tắt nếu không dùng môi trường unit testing in-game
+  mock-events: true
+
+  # Quản trị & truy vấn trực tiếp cơ sở dữ liệu SQLite DataStore (/jdb)
+  # [Tiết kiệm]: Tắt nếu không cần truy vấn SQL từ trong game
+  database-query: true
+
+  # Giao diện dòng lệnh tập trung tối thượng (/js)
+  # [Tiết kiệm]: Tắt nếu chỉ muốn dùng các lệnh đơn lẻ truyền thống
+  universal-command: true
+
+  # Trình soạn thảo Monaco Web IDE trên nền Web (:8085)
+  # [Tiết kiệm]: Tắt nếu không dùng giao diện code web trên cổng 8085
+  webide: true
+
+  # Đếm nhịp Gas ngắt vòng lặp vô tận cấp bytecode (Gas Metering)
+  # [Tiết kiệm]: Bật để bảo vệ luồng Server Thread khỏi while(true)
+  gas-meter: true
+
+  # Vá nóng bytecode phương thức trong RAM không cần unload (HotSwap Engine)
+  # [Tiết kiệm]: Tắt nếu muốn luôn dùng Dynamic Reload truyền thống
+  hotswap-engine: true
+
 # ==============================================================
 # 1. DANH SÁCH DYNAMIC PLUGINS TỰ ĐỘNG NẠP KHI SERVER KHỞI ĐỘNG
 # ==============================================================
@@ -196,6 +250,7 @@ security:
   sandbox:
     enabled: true
     max-execution-ms: 5000
+    max-gas-ops: 12000000
     blocked-keywords:
       - "Runtime.getRuntime().halt"
 
@@ -203,6 +258,8 @@ security:
 compiler:
   # Phiên bản Bytecode nhắm tới khi biên dịch động (21, 22, 23, 24, 25,...; mặc định 21 để tương thích toàn bộ server Java 21+)
   target-release: 21
+  # Tự động nạp JVM Agent nội bộ qua VirtualMachine.attach để hỗ trợ HotSwap không mất trạng thái RAM
+  self-attach-hotswap: true
   options:
     - "-parameters"
     - "-Xlint:none"
@@ -336,12 +393,26 @@ anticheat:
     vl-trigger: 4.0
     duration-ticks: 120
 
-  # Cổng Web Quản Trị & Live 3D Radar (Hướng 2: Web Dashboard)
-  # Tích hợp máy chủ HTTP siêu nhẹ port 8085, xem TPS, MSPT, CPS, Ping, VL và Live Radar
+  # Cổng Web Quản Trị & Live 3D Radar (Yêu cầu cài thêm plugin mở rộng JavaStudio-Web-1.0.0.jar)
+  # Hỗ trợ tự động chế độ Panel 1-Port (gộp chung HTTP + Minecraft trên duy nhất 1 port của server!)
   web-dashboard:
     enabled: true
+    # Chế độ gộp 1 cổng cho Hosting Panel (Pterodactyl, Pelican, Crafty, Docker...):
+    # - "auto": Tự động nhận diện Panel 1-Port hoặc tự chuyển sang gộp chung cổng Minecraft khi cổng 8085 bận
+    # - "true": Luôn đi chung cổng chính của Minecraft (không mở thêm bất kỳ port phụ nào ra ngoài)
+    # - "false": Tắt gộp cổng, chỉ dùng port độc lập bên dưới
+    single-port: "auto"
+    # Tên miền hoặc IP công khai của Panel (bỏ trống "" để tự động học từ kết nối người chơi / biến môi trường Panel)
+    public-host: ""
+    # Cổng công khai bên ngoài Panel nếu khác cổng nội bộ (0 = tự động nhận diện)
+    public-port: 0
+    # Giao thức hiển thị link ("http" hoặc "https" nếu đứng sau Cloudflare/Reverse Proxy)
+    public-scheme: "http"
     port: 8085
-    auth-token: "admin123"
+    # Địa chỉ lắng nghe khi chạy trên máy cá nhân (127.0.0.1 = an toàn nhất).
+    bind-address: "127.0.0.1"
+    # Để trống: plugin tự sinh token ngẫu nhiên 48 ký tự ở lần chạy đầu và in ra console.
+    auth-token: ""
 
   # Bẫy Quặng Ảo & Chống X-Ray / Freecam (Hướng 2 mới: Honeypot Ore Engine)
   xray:
@@ -481,7 +552,7 @@ anticheat:
     criticals:
       enabled: true
       max-vl: 10.0
-      cancel-event: false
+      cancel-event: true
 
     multiactions:
       enabled: true
@@ -691,9 +762,18 @@ packet-sniffer:
 # ==============================================================
 resource-pack:
   enabled: true
-  # Địa chỉ IP hoặc Hostname của server cấp phát gói
-  host: "localhost"
-  # Cổng HTTP Server chạy ngầm phục vụ tải Resource Pack
+  # Khởi chạy Embedded HTTP Server tích hợp để Minecraft Client tải trực tiếp gói ZIP
+  http-enabled: true
+  # Chế độ Panel 1-Port ("auto", "true", "false"):
+  # Khi chạy trên Panel chỉ có 1 port duy nhất, tự động phát file /pack.zip ngay trên cổng Minecraft chính!
+  single-port: "auto"
+  # Cổng công khai bên ngoài Panel nếu dùng NAT/Port Forwarding khác cổng nội bộ (0 = tự động)
+  public-port: 0
+  # Địa chỉ lắng nghe của HTTP Server khi dùng port phụ độc lập
+  bind-address: "0.0.0.0"
+  # Địa chỉ IP hoặc Domain công khai gửi cho Minecraft Client (để 127.0.0.1 sẽ tự học theo IP người chơi kết nối vào)
+  host: "127.0.0.1"
+  # Cổng HTTP Server chạy ngầm khi dùng trên máy cá nhân / VPS nhiều port
   port: 8088
   # URL tải tùy biến (bỏ trống để tự động sinh từ host:port)
   download-url: ""
@@ -825,3 +905,24 @@ telemetry-nexus:
   sampling-interval-seconds: 5
   # Bật tính năng tự động phát hiện rò rỉ bộ nhớ ClassLoader sau khi reload plugin
   leak-detection: true
+
+# ==============================================================
+# 19. MẠNG CỤM P2P CLUSTER MESH (RAFT + HMAC-SHA256) & NETWORK SYNC (/jmesh)
+# ==============================================================
+network:
+  mesh-port: 25590
+  mesh-bind: "0.0.0.0"
+  mesh-discovery: true
+  mesh-seeds: []
+  # Để trống để tự sinh khóa 64 ký tự ngẫu nhiên ở lần khởi động đầu; đặt giống nhau giữa các node trong cụm.
+  mesh-secret: ""
+  # Địa chỉ lắng nghe cho NetworkSync Master (/jnetwork)
+  sync-bind: "127.0.0.1"
+  # Đồng bộ kho đồ cụm máy chủ phân tán (Zero-Dupe Cross-Server Inventory Sync)
+  inventory-sync:
+    enabled: true
+    sync-enderchest: true
+    sync-stats: true
+    sync-potion-effects: true
+    lock-timeout-ms: 15000
+    save-local-backups: true

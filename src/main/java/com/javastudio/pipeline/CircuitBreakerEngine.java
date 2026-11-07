@@ -21,36 +21,26 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * CircuitBreakerEngine: Hệ thống cầu chì tự ngắt chống sập server (Circuit Breaker)
- * kết hợp Live Tracer & Exception Flight Recorder (Hộp đen ngoại lệ).
- * Giám sát tới từng nano-giây tầng EventExecutor trong HandlerList của Bukkit/Paper/Folia.
- */
 public final class CircuitBreakerEngine {
 
     public enum BreakerState {
-        CLOSED,     // Hoạt động bình thường
-        OPEN,       // Đã ngắt cô lập do vượt ngưỡng lỗi hoặc gây lag
-        HALF_OPEN   // Đang thử nghiệm phục hồi tự động
+        CLOSED,
+        OPEN,
+        HALF_OPEN
     }
 
-    // Ngưỡng cấu hình mặc định (có thể chỉnh live qua /jtrace config)
     private volatile int maxErrorsPerSecond = 15;
     private volatile double maxExecutionMs = 40.0;
     private volatile int maxConsecutiveSlowCalls = 5;
-    private volatile long recoveryCooldownMs = 30_000L; // 30 giây tự thử đóng mạch lại
+    private volatile long recoveryCooldownMs = 30_000L;
 
     private final Map<String, BreakerNode> breakers = new ConcurrentHashMap<>();
     private final Map<String, CrashSnapshot> crashVault = new ConcurrentHashMap<>();
     private final Deque<String> crashOrder = new ConcurrentLinkedDeque<>();
     private static final int MAX_CRASH_SNAPSHOTS = 50;
 
-    // Danh sách Admin đang bật chế độ theo dõi thời gian thực: UUID -> Bộ lọc
     private final Map<UUID, TraceSession> activeWatchers = new ConcurrentHashMap<>();
 
-    /**
-     * Quét và gắn cầu chì bảo vệ vào toàn bộ Listener của một Plugin (hoặc toàn server nếu null)
-     */
     public int instrumentPlugin(Plugin targetPlugin) {
         int hookedCount = 0;
         try {
@@ -64,7 +54,7 @@ public final class CircuitBreakerEngine {
                     }
                     EventExecutor currentExec = (EventExecutor) executorField.get(regListener);
                     if (currentExec instanceof MonitoredEventExecutor) {
-                        continue; // Đã được bọc bảo vệ trước đó
+                        continue;
                     }
 
                     String listenerClass = regListener.getListener().getClass().getSimpleName();
@@ -85,9 +75,6 @@ public final class CircuitBreakerEngine {
         return hookedCount;
     }
 
-    /**
-     * Trình thực thi sự kiện có gắn đồng hồ đo nano-giây và cầu chì tự ngắt
-     */
     private final class MonitoredEventExecutor implements EventExecutor {
         private final EventExecutor delegate;
         private final BreakerNode node;
@@ -101,14 +88,13 @@ public final class CircuitBreakerEngine {
         public void execute(Listener listener, Event event) throws EventException {
             String eventName = event.getEventName();
 
-            // 1. Kiểm tra trạng thái cầu chì
             if (node.state == BreakerState.OPEN) {
                 long now = System.currentTimeMillis();
                 if (now - node.trippedTimestamp >= recoveryCooldownMs) {
                     node.state = BreakerState.HALF_OPEN;
                 } else {
                     node.skippedCalls.incrementAndGet();
-                    return; // Bỏ qua ngay lập tức để bảo vệ Server
+                    return;
                 }
             }
 
@@ -119,7 +105,6 @@ public final class CircuitBreakerEngine {
             try {
                 delegate.execute(listener, event);
 
-                // Nếu thử nghiệm phục hồi (HALF_OPEN) thành công, đóng mạch lại
                 if (node.state == BreakerState.HALF_OPEN) {
                     node.reset();
                     broadcastToAdmins("§a[CircuitBreaker] §fĐã tự động phục hồi §e" + node.id + " §fsau khi ổn định.");
@@ -132,7 +117,6 @@ public final class CircuitBreakerEngine {
                 double durationMs = durationNano / 1_000_000.0;
                 node.recordExecution(durationNano);
 
-                // 2. Kiểm tra quá tải thời gian thực thi (MSPT Spike trên Main Thread)
                 if (Bukkit.isPrimaryThread() && durationMs >= maxExecutionMs) {
                     int slowStreak = node.consecutiveSlowCalls.incrementAndGet();
                     if (slowStreak >= maxConsecutiveSlowCalls && node.state != BreakerState.OPEN) {
@@ -143,7 +127,6 @@ public final class CircuitBreakerEngine {
                     node.consecutiveSlowCalls.set(0);
                 }
 
-                // 3. Phát luồng dữ liệu cho Admin đang dùng lệnh /jtrace watch
                 if (!activeWatchers.isEmpty()) {
                     boolean postCancelled = (event instanceof Cancellable c) && c.isCancelled();
                     dispatchTraceLog(node, event, durationMs, preCancelled, postCancelled, caughtError);
@@ -154,7 +137,6 @@ public final class CircuitBreakerEngine {
         private void handleExecutionFailure(Listener listener, Event event, Throwable error) {
             int currentSecErrors = node.incrementErrorCount();
 
-            // Chụp "Hộp đen" (Flight Recorder Snapshot) ngay thời điểm xảy ra lỗi
             String crashId = "ERR-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
             CrashSnapshot snapshot = new CrashSnapshot(
                     crashId,
@@ -166,7 +148,6 @@ public final class CircuitBreakerEngine {
             );
             storeCrashSnapshot(snapshot);
 
-            // Kiểm tra vượt ngưỡng lỗi trên giây
             if (currentSecErrors >= maxErrorsPerSecond || node.state == BreakerState.HALF_OPEN) {
                 tripBreaker(node, "Phát sinh " + currentSecErrors + " lỗi/giây (" + error.getClass().getSimpleName()
                         + "). Mã hộp đen: §e" + crashId);
@@ -208,9 +189,6 @@ public final class CircuitBreakerEngine {
         }
     }
 
-    /**
-     * Đọc toàn bộ biến trong RAM của đối tượng tại thời điểm xảy ra lỗi (phục vụ Hộp Đen)
-     */
     private Map<String, String> inspectObjectFields(Object target) {
         Map<String, String> dump = new LinkedHashMap<>();
         if (target == null) return dump;
@@ -252,7 +230,6 @@ public final class CircuitBreakerEngine {
         }
     }
 
-    // --- Các hàm quản trị phục vụ JTraceCommand ---
 
     public void startWatching(UUID playerUuid, String keyword, double minMs) {
         activeWatchers.put(playerUuid, new TraceSession(keyword.toLowerCase(), minMs));
@@ -296,12 +273,25 @@ public final class CircuitBreakerEngine {
         return list;
     }
 
+    public CrashSnapshot getLatestCrashForPlugin(String pluginName) {
+        if (pluginName == null || pluginName.isBlank()) return null;
+        String needle = pluginName.toLowerCase(Locale.ROOT);
+        for (String id : crashOrder) {
+            CrashSnapshot s = crashVault.get(id);
+            if (s == null) continue;
+            if (s.nodeId.toLowerCase(Locale.ROOT).contains(needle)
+                    || s.fullStackTrace.toLowerCase(Locale.ROOT).contains(needle)) {
+                return s;
+            }
+        }
+        return null;
+    }
+
     public void setMaxErrorsPerSecond(int val) { this.maxErrorsPerSecond = Math.max(1, val); }
     public void setMaxExecutionMs(double val) { this.maxExecutionMs = Math.max(1.0, val); }
     public int getMaxErrorsPerSecond() { return maxErrorsPerSecond; }
     public double getMaxExecutionMs() { return maxExecutionMs; }
 
-    // --- Cấu trúc dữ liệu nội bộ ---
 
     public record TraceSession(String keyword, double minDurationMs) {}
 
@@ -374,6 +364,7 @@ public final class CircuitBreakerEngine {
         public final String exceptionType;
         public final String exceptionMessage;
         public final String shortStackTrace;
+        public final String fullStackTrace;
         public final Map<String, String> listenerFields;
         public final Map<String, String> eventFields;
 
@@ -390,7 +381,8 @@ public final class CircuitBreakerEngine {
 
             StringWriter sw = new StringWriter();
             error.printStackTrace(new PrintWriter(sw));
-            String[] lines = sw.toString().split("\n");
+            this.fullStackTrace = sw.toString();
+            String[] lines = this.fullStackTrace.split("\n");
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < Math.min(lines.length, 6); i++) {
                 sb.append("  §c").append(lines[i].trim()).append("\n");

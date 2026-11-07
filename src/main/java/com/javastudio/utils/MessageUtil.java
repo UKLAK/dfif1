@@ -7,10 +7,6 @@ import java.lang.reflect.Method;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Tiện ích gửi tin nhắn định dạng màu sắc tương thích hoàn toàn
- * giữa Paper, Purpur (hỗ trợ Adventure Component & MiniMessage) và Spigot thuần túy.
- */
 public class MessageUtil {
 
     private static final Pattern GRADIENT_PATTERN = Pattern.compile("<gradient:#([A-Fa-f0-9]{6}):#([A-Fa-f0-9]{6})>(.*?)</gradient>", Pattern.CASE_INSENSITIVE);
@@ -19,14 +15,10 @@ public class MessageUtil {
     private static final Pattern HEX_PATTERN = Pattern.compile("&#([A-Fa-f0-9]{6})");
     private static final String PREFIX = "&8[&bJava&3Studio&8] &r";
 
-    /**
-     * Dịch mã màu &a, &b, &c, Hex &#RRGGBB, <#RRGGBB>, <gradient:#color1:#color2> và <rainbow>.
-     */
     @SuppressWarnings("deprecation")
     public static String colorize(String text) {
         if (text == null) return "";
 
-        // 1. Xử lý Gradient <gradient:#color1:#color2>text</gradient>
         Matcher gradMatcher = GRADIENT_PATTERN.matcher(text);
         StringBuilder gradBuffer = new StringBuilder();
         while (gradMatcher.find()) {
@@ -38,7 +30,6 @@ public class MessageUtil {
         gradMatcher.appendTail(gradBuffer);
         text = gradBuffer.toString();
 
-        // 2. Xử lý Rainbow <rainbow>text</rainbow>
         Matcher rainMatcher = RAINBOW_PATTERN.matcher(text);
         StringBuilder rainBuffer = new StringBuilder();
         while (rainMatcher.find()) {
@@ -48,7 +39,6 @@ public class MessageUtil {
         rainMatcher.appendTail(rainBuffer);
         text = rainBuffer.toString();
 
-        // 3. Xử lý thẻ <#RRGGBB>
         Matcher tagHex = TAG_HEX_PATTERN.matcher(text);
         StringBuilder tagBuffer = new StringBuilder();
         while (tagHex.find()) {
@@ -58,7 +48,6 @@ public class MessageUtil {
         tagHex.appendTail(tagBuffer);
         text = tagBuffer.toString();
 
-        // 4. Chuyển đổi mã màu hex &#RRGGBB sang định dạng Spigot §x§R§R§G§G§B§B
         Matcher matcher = HEX_PATTERN.matcher(text);
         StringBuilder buffer = new StringBuilder();
         while (matcher.find()) {
@@ -114,16 +103,10 @@ public class MessageUtil {
         return sb.toString();
     }
 
-    /**
-     * Alias rút gọn cho colorize
-     */
     public static String color(String text) {
         return colorize(text);
     }
 
-    /**
-     * Gửi tin nhắn kèm tiền tố mặc định
-     */
     public static void send(CommandSender sender, String message) {
         if (sender == null || message == null) return;
         String formatted = PREFIX + message;
@@ -136,9 +119,6 @@ public class MessageUtil {
         sender.sendMessage(colorize(formatted));
     }
 
-    /**
-     * Gửi tin nhắn không kèm tiền tố
-     */
     public static void sendRaw(CommandSender sender, String message) {
         if (sender == null || message == null) return;
         if (PlatformUtil.isAdventureSupported()) {
@@ -150,9 +130,6 @@ public class MessageUtil {
         sender.sendMessage(colorize(message));
     }
 
-    /**
-     * Phát sóng tin nhắn tới toàn bộ người chơi và Console với hỗ trợ màu sắc & Adventure đầy đủ.
-     */
     public static void broadcast(String message) {
         if (message == null) return;
         for (org.bukkit.entity.Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
@@ -161,10 +138,6 @@ public class MessageUtil {
         sendRaw(org.bukkit.Bukkit.getConsoleSender(), message);
     }
 
-    /**
-     * Cầu nối Adventure an toàn: Sử dụng Reflection để tương thích với Paper/Purpur/Folia
-     * mà không gây lỗi liên kết class trên Spigot hoặc thiếu thư viện lúc compile.
-     */
     private static class AdventureBridge {
         static void sendMessage(CommandSender sender, String text) {
             try {
@@ -183,46 +156,27 @@ public class MessageUtil {
         }
     }
 
-    /**
-     * Gửi thông báo thành công
-     */
     public static void sendSuccess(CommandSender sender, String message) {
         send(sender, "&a✔ " + message);
     }
 
-    /**
-     * Gửi thông báo lỗi
-     */
     public static void sendError(CommandSender sender, String message) {
         send(sender, "&c✖ " + message);
     }
 
-    /**
-     * Gửi thông báo cảnh báo
-     */
     public static void sendWarning(CommandSender sender, String message) {
         send(sender, "&e⚠ " + message);
     }
 
-    /**
-     * Gửi thông báo thông tin
-     */
     public static void sendInfo(CommandSender sender, String message) {
         send(sender, "&bℹ &7" + message);
     }
 
-    /**
-     * Gửi tiêu đề phân cách có viền định dạng đẹp mắt
-     */
     public static void sendHeader(CommandSender sender, String title) {
         if (sender == null) return;
         sendRaw(sender, "&8&m═════════════════&r &b&l" + (title != null ? title : "") + " &8&m═════════════════");
     }
 
-    /**
-     * Gửi thanh Action Bar trên hotbar người chơi.
-     * Tương thích chéo Paper/Purpur/Folia (Adventure Component) và Spigot (BungeeChat).
-     */
     @SuppressWarnings("deprecation")
     public static void sendActionBar(org.bukkit.entity.Player player, String message) {
         if (player == null || message == null) return;
@@ -242,7 +196,6 @@ public class MessageUtil {
             } catch (Throwable ignored) {}
         }
 
-        // Spigot fallback
         try {
             player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR, net.md_5.bungee.api.chat.TextComponent.fromLegacyText(colored));
         } catch (Throwable ignored) {

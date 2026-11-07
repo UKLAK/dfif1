@@ -5,15 +5,6 @@ import com.javastudio.control.ServerController;
 import com.javastudio.profiler.DynamicPluginProfiler;
 
 
-/**
- * Trung Tâm Đo Lường & Chẩn Đoán Hiệu Năng Hợp Nhất (Telemetry & Diagnostics Nexus).
- * Kết nối chặt chẽ giữa:
- * 1. Server Controller (Giám sát tài nguyên máy chủ, TPS, MSPT, RAM, CPU)
- * 2. Health Monitor (Báo động sức khỏe & tự động dọn rác khẩn cấp)
- * 3. Dynamic Plugin Profiler (Đo nanosecond từng event của plugin động)
- * 4. Metrics Collector (Lịch sử mẫu đo lường)
- * 5. Debug HUD Manager (Giao diện hiển thị trực quan in-game)
- */
 public final class TelemetryNexus {
 
     private final JavaStudioPlugin plugin;
@@ -51,9 +42,6 @@ public final class TelemetryNexus {
         this.hudManager = hudManager;
     }
 
-    /**
-     * Chụp nhanh toàn bộ dữ liệu hiệu năng hiện tại của máy chủ.
-     */
     public TelemetrySnapshot captureSnapshot() {
         double[] tpsArr = serverController != null ? serverController.getTPS() : new double[]{20.0};
         double tps = tpsArr.length > 0 ? tpsArr[0] : 20.0;
@@ -70,7 +58,6 @@ public final class TelemetryNexus {
 
         int activePlugins = plugin.getPluginManager() != null ? plugin.getPluginManager().getActivePlugins().size() : 0;
 
-        // Trích xuất Dynamic Plugin tốn CPU nhất từ Profiler
         String slowestPlugin = "Không có";
         if (profiler != null) {
             var metrics = profiler.getAllMetrics();
@@ -103,9 +90,6 @@ public final class TelemetryNexus {
         );
     }
 
-    /**
-     * Kích hoạt dọn dẹp tổng thể khẩn cấp (Purge Entities + Garbage Collection).
-     */
     public void executeEmergencyCleanup() {
         if (serverController != null) {
             serverController.purgeEntities(null);

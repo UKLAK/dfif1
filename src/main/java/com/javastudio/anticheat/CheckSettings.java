@@ -8,10 +8,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Cấu hình đã nạp sẵn của một check (đọc từ anticheat.checks.&lt;key&gt;).
- * Các giá trị riêng của check (ngưỡng, buffer...) được cache vào Map để truy xuất nhanh trong event.
- */
 public final class CheckSettings {
 
     private final CheckType type;

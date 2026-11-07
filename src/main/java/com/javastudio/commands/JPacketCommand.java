@@ -17,9 +17,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Lệnh điều khiển giám sát Netty Packet Sniffer (/jpacket).
- */
 public class JPacketCommand implements CommandExecutor, TabCompleter {
 
     private final JavaStudioPlugin plugin;

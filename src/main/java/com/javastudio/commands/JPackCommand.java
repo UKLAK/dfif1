@@ -17,9 +17,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Lệnh quản lý Resource Pack & Custom Model Data (/jpack).
- */
 public class JPackCommand implements CommandExecutor, TabCompleter {
 
     private final JavaStudioPlugin plugin;
@@ -54,9 +51,10 @@ public class JPackCommand implements CommandExecutor, TabCompleter {
                 MessageUtil.sendInfo(sender, "Đang nén lại Resource Pack trong RAM...");
                 boolean ok = packHost.buildPack();
                 if (ok) {
+                    Player viewer = sender instanceof Player p ? p : null;
                     MessageUtil.sendSuccess(sender, "Đóng gói thành công (" + (packHost.getZipBytes().length / 1024) + " KB)!");
                     MessageUtil.sendRaw(sender, "§7Mã kiểm tra SHA-1: §e" + packHost.getSha1Hash());
-                    MessageUtil.sendRaw(sender, "§7Địa chỉ tải: §b" + packHost.getDownloadUrl());
+                    MessageUtil.sendRaw(sender, "§7Địa chỉ tải: §b" + packHost.getDownloadUrl(viewer));
                 } else {
                     MessageUtil.sendError(sender, "Đóng gói Resource Pack thất bại. Kiểm tra console để xem chi tiết!");
                 }
@@ -134,18 +132,18 @@ public class JPackCommand implements CommandExecutor, TabCompleter {
                 MessageUtil.sendInfo(target, "Bạn vừa nhận được vật phẩm custom: §e" + itemId);
             }
             case "demo" -> {
-                // Tạo sẵn 2 vật phẩm mẫu và 1 âm thanh mẫu
                 packHost.registerItem("ruby_sword", Material.DIAMOND_SWORD, 10001, "&c&lKiếm Huyết Ngọc (Ruby Sword)");
                 packHost.registerItem("magic_wand", Material.BLAZE_ROD, 10002, "&d&lGậy Phép Thuật (Magic Wand)");
                 packHost.registerSound("magic_cast", "javastudio:custom.magic");
                 packHost.registerFontGlyph("chest_overlay", "\uE001", "textures/font/chest_overlay.png");
+                packHost.buildPack();
 
-                MessageUtil.sendSuccess(sender, "Đã khởi tạo các định nghĩa mẫu:");
+                MessageUtil.sendSuccess(sender, "Đã khởi tạo và đóng gói JSON định nghĩa mẫu:");
                 MessageUtil.sendRaw(sender, "  §f- Vật phẩm: §bruby_sword §7(CMD: 10001)");
                 MessageUtil.sendRaw(sender, "  §f- Vật phẩm: §bmagic_wand §7(CMD: 10002)");
                 MessageUtil.sendRaw(sender, "  §f- Âm thanh: §amagic_cast §7(javastudio:custom.magic)");
                 MessageUtil.sendRaw(sender, "  §f- Font GUI: §6chest_overlay §7(\\uE001)");
-                MessageUtil.sendRaw(sender, "§7Gõ §e/jpack give <tên> ruby_sword §7để nhận thử vật phẩm!");
+                MessageUtil.sendRaw(sender, "§7Gõ §e/jpack give <tên> ruby_sword §7hoặc §e/jpack push §7để trải nghiệm!");
             }
             default -> {
                 MessageUtil.sendError(sender, "Lệnh không hợp lệ! Dùng: /jpack [status|build|push|list|give|demo]");
@@ -155,11 +153,16 @@ public class JPackCommand implements CommandExecutor, TabCompleter {
     }
 
     private void showStatus(CommandSender sender) {
-        MessageUtil.sendHeader(sender, "QUẢN LÝ RESOURCE PACK (v3.0 HOST)");
+        Player viewer = sender instanceof Player p ? p : null;
+        MessageUtil.sendHeader(sender, "QUẢN LÝ RESOURCE PACK (EMBEDDED HTTP HOST)");
         MessageUtil.sendRaw(sender, "§fTrạng thái Pack: " + (packHost.getZipBytes().length > 0 ? "§a✔ Đã nén sẵn sàng" : "§c✖ Chưa nén"));
-        MessageUtil.sendRaw(sender, "§fDung lượng ZIP: §e" + (packHost.getZipBytes().length / 1024) + " KB");
+        MessageUtil.sendRaw(sender, "§fMáy chủ HTTP: " + (packHost.isHttpRunning() ? "§a✔ Đang chạy" : "§e⚠ Đang tắt") + " §7(Lượt tải: §b" + packHost.getTotalDownloads() + "§7)");
+        MessageUtil.sendRaw(sender, "§fChế độ cổng: " + (packHost.isSinglePortMode()
+                ? "§a§lPANEL 1-PORT §7(Đi chung cổng Minecraft §e:" + Bukkit.getPort() + "§7)"
+                : "§e§lCỔNG ĐỘC LẬP §7(:" + plugin.getConfig().getInt("resource-pack.port", 8088) + ")"));
+        MessageUtil.sendRaw(sender, "§fDung lượng ZIP: §e" + Math.max(1, packHost.getZipBytes().length / 1024) + " KB");
         MessageUtil.sendRaw(sender, "§fMã SHA-1 Hash: §d" + (packHost.getSha1Hash().isEmpty() ? "Chưa có" : packHost.getSha1Hash()));
-        MessageUtil.sendRaw(sender, "§fĐường dẫn HTTP: §b" + packHost.getDownloadUrl());
+        MessageUtil.sendRaw(sender, "§fĐường dẫn HTTP: §b" + packHost.getDownloadUrl(viewer));
         MessageUtil.sendRaw(sender, "§fVật phẩm đã đăng ký: §a" + packHost.getCustomItems().size() + " items");
         MessageUtil.sendRaw(sender, "§fThư mục tài nguyên: §7" + packHost.getPackDir().getAbsolutePath());
         MessageUtil.sendRaw(sender, "§7Lệnh thao tác:");

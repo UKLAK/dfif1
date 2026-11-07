@@ -15,9 +15,6 @@ import org.bukkit.plugin.Plugin;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * Lệnh điều khiển Live Event Tracer và Cầu chì tự ngắt Circuit Breaker (/jtrace, /jt, /jbreaker).
- */
 public final class JTraceCommand implements CommandExecutor, TabCompleter {
 
     private final CircuitBreakerEngine engine;
@@ -92,7 +89,6 @@ public final class JTraceCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        // Tự động đảm bảo các plugin đã được gắn bộ đo trước khi watch
         engine.instrumentPlugin(null);
         engine.startWatching(player.getUniqueId(), keyword, minMs);
 

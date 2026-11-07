@@ -14,11 +14,6 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Lớp Bootstrap độc lập được đóng gói kèm khi xuất plugin ra file JAR.
- * Cho phép Dynamic Plugin chạy trên BẤT KỲ máy chủ Paper/Purpur/Spigot nào
- * mà KHÔNG cần cài đặt JavaStudio!
- */
 public class StandaloneBootstrap extends JavaPlugin {
 
     private DynamicPlugin dynamicPlugin;
@@ -29,7 +24,6 @@ public class StandaloneBootstrap extends JavaPlugin {
     public void onEnable() {
         saveDefaultConfig();
 
-        // Đọc class chính từ file metadata nhúng sẵn
         String mainClassName = null;
         try (InputStream in = getResource("javastudio_meta.yml")) {
             if (in != null) {
@@ -38,7 +32,6 @@ public class StandaloneBootstrap extends JavaPlugin {
             }
         } catch (Exception ignored) {}
 
-        // Kiểm tra bản quyền nếu file JAR được gắn license
         try (InputStream licIn = getResource("javastudio_license.key")) {
             if (licIn != null) {
                 String licenseKey = new String(licIn.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).trim();
@@ -86,7 +79,6 @@ public class StandaloneBootstrap extends JavaPlugin {
             Class<?> clazz = Class.forName(mainClassName);
             dynamicPlugin = (DynamicPlugin) clazz.getDeclaredConstructor().newInstance();
 
-            // Khởi tạo các trường dữ liệu nội bộ của DynamicPlugin thông qua Reflection
             injectBootstrapFields(dynamicPlugin);
 
             dynamicPlugin.setEnabled(true);
@@ -109,13 +101,11 @@ public class StandaloneBootstrap extends JavaPlugin {
                 getLogger().warning("Lỗi trong onDisable(): " + t.getMessage());
             }
 
-            // Dọn dẹp listeners
             for (Listener l : registeredListeners) {
                 HandlerList.unregisterAll(l);
             }
             registeredListeners.clear();
 
-            // Dọn dẹp commands
             for (String cmd : registeredCommands) {
                 ReflectionUtil.unregisterCommand(cmd);
             }

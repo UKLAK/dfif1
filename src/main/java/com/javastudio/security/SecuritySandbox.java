@@ -1,19 +1,17 @@
 package com.javastudio.security;
 
 import com.javastudio.JavaStudioPlugin;
+import com.javastudio.pipeline.ExecutionWatchdog;
+import org.bukkit.Bukkit;
 
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.regex.Pattern;
 
-/**
- * Hộp cát an ninh (Security Sandbox) và Giám sát thời gian thực thi (Timeout Watchdog).
- * Ngăn chặn mã độc phá hoại server (System.exit, ProcessBuilder, Unsafe) và vòng lặp vô tận (while true).
- */
 public class SecuritySandbox {
 
     private final JavaStudioPlugin plugin;
-    private final ExecutorService watchdogExecutor = Executors.newCachedThreadPool();
+    private final ExecutorService watchdogExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
     public record SandboxRule(Pattern pattern, String ruleId, String description) {}
 
@@ -64,7 +62,7 @@ public class SecuritySandbox {
                     "Phát hiện nạp Reflection các lớp hệ thống bị cấm!"
             ),
             new SandboxRule(
-                    Pattern.compile("(ClassLoader\\s*\\.\\s*defineClass|defineAnonymousClass|URLClassLoader)", Pattern.CASE_INSENSITIVE),
+                    Pattern.compile("(ClassLoader\\s*\\.\\s*defineClass|defineAnonymousClass|defineHiddenClass|URLClassLoader)", Pattern.CASE_INSENSITIVE),
                     "CLASS_LOADER_INJECTION",
                     "Phát hiện hành vi tiêm lớp động (Dynamic ClassLoader/defineClass)!"
             ),
@@ -114,15 +112,9 @@ public class SecuritySandbox {
         this.plugin = plugin;
     }
 
-    /**
-     * Kiểm tra mã nguồn xem có vi phạm quy tắc an ninh không.
-     *
-     * @param sourceCode Nội dung mã nguồn cần quét
-     * @return null nếu an toàn, hoặc chuỗi cảnh báo lý do từ chối nếu vi phạm
-     */
     public String validateCode(String sourceCode) {
         if (!plugin.getConfig().getBoolean("security.sandbox.enabled", true)) {
-            return null; // Sandbox bị vô hiệu hóa
+            return null;
         }
 
         if (sourceCode == null || sourceCode.isEmpty()) {
@@ -145,15 +137,12 @@ public class SecuritySandbox {
         return null;
     }
 
-    /**
-     * Kiểm tra đường dẫn tệp tin có nằm an toàn trong thư mục gốc không (Chống Path Traversal).
-     */
     public static boolean isPathSafe(java.io.File baseDir, java.io.File targetFile) {
         if (baseDir == null || targetFile == null) return false;
         try {
             String base = baseDir.getCanonicalPath();
             String target = targetFile.getCanonicalPath();
-            return target.startsWith(base);
+            return target.startsWith(base + java.io.File.separator) || target.equals(base);
         } catch (java.io.IOException e) {
             return false;
         }
@@ -165,9 +154,6 @@ public class SecuritySandbox {
             "googleapis.com", "openai.com", "anthropic.com", "repo1.maven.org"
     );
 
-    /**
-     * Kiểm tra xem địa chỉ Host/Domain có nằm trong danh sách mạng an toàn (Egress Whitelist) không.
-     */
     public boolean isDomainAllowed(String host) {
         if (host == null || host.isBlank()) return false;
         String lower = host.toLowerCase().trim();
@@ -188,19 +174,40 @@ public class SecuritySandbox {
         T call() throws Throwable;
     }
 
-    /**
-     * Thực thi một tác vụ có giới hạn thời gian (Timeout Watchdog) để chống vòng lặp vô tận.
-     */
     public <T> T executeWithTimeout(DangerousCallable<T> task, long timeoutMs) throws Throwable {
+        long maxOps = plugin.getConfig().getLong("security.sandbox.max-gas-ops", GasMeter.DEFAULT_MAX_OPS);
         if (timeoutMs <= 0) {
-            return task.call();
+            GasMeter.start(maxOps, 10_000L);
+            try {
+                return task.call();
+            } finally {
+                GasMeter.stop();
+            }
+        }
+
+        boolean onPrimaryThread = false;
+        try {
+            onPrimaryThread = Bukkit.isPrimaryThread();
+        } catch (Throwable ignored) {}
+
+        if (onPrimaryThread) {
+            long primarySafeMs = Math.min(timeoutMs, Math.max(500L, ExecutionWatchdog.getMainThreadLimitMs()));
+            GasMeter.start(maxOps, primarySafeMs);
+            try {
+                return task.call();
+            } finally {
+                GasMeter.stop();
+            }
         }
 
         Future<T> future = watchdogExecutor.submit(() -> {
+            GasMeter.start(maxOps * 4L, timeoutMs);
             try {
                 return task.call();
             } catch (Throwable t) {
                 throw new CompletionException(t);
+            } finally {
+                GasMeter.stop();
             }
         });
 
@@ -208,7 +215,7 @@ public class SecuritySandbox {
             return future.get(timeoutMs, TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
             future.cancel(true);
-            throw new TimeoutException("Thực thi quá thời gian cho phép (" + timeoutMs + "ms). Đã dừng tác vụ để tránh treo máy chủ!");
+            throw new TimeoutException("Thực thi quá thời gian cho phép (" + timeoutMs + "ms). Đã dừng tác vụ và ngắt Gas để tránh treo máy chủ!");
         } catch (ExecutionException e) {
             Throwable cause = e.getCause();
             if (cause instanceof CompletionException && cause.getCause() != null) {

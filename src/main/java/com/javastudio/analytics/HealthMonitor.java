@@ -10,50 +10,28 @@ import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/**
- * Trình giám sát sức khỏe hệ thống tiên tiến cho JavaStudio.
- *
- * <p>Thu thập và lưu trữ lịch sử các chỉ số hiệu năng quan trọng theo thời gian thực:</p>
- * <ul>
- *     <li><strong>TPS (Ticks Per Second)</strong>: Tốc độ game loop, tối đa 20.0</li>
- *     <li><strong>MSPT (Milliseconds Per Tick)</strong>: Thời gian xử lý mỗi tick</li>
- *     <li><strong>Heap Memory</strong>: Bộ nhớ JVM heap (used / max)</li>
- *     <li><strong>GC Pressure</strong>: Tần suất và thời gian Garbage Collection</li>
- *     <li><strong>Thread Count</strong>: Số luồng JVM đang hoạt động</li>
- *     <li><strong>Uptime</strong>: Thời gian server đã chạy</li>
- * </ul>
- *
- * <p>Dữ liệu được lưu trữ dưới dạng chuỗi thời gian (TimeSeries) 60 mẫu gần nhất,
- * phục vụ hiển thị biểu đồ live trên Web IDE Dashboard.</p>
- */
 public class HealthMonitor {
 
     private final JavaStudioPlugin plugin;
+    private final long startupTime = System.currentTimeMillis();
 
-    // TimeSeries lưu 120 mẫu gần nhất (mỗi 5 giây = 10 phút lịch sử)
     private static final int MAX_SAMPLES = 120;
     private final Deque<HealthSnapshot> history = new ConcurrentLinkedDeque<>();
     private final List<HealthAlert> activeAlerts = new CopyOnWriteArrayList<>();
 
-    // TPS tracker
     private long lastTickTime = System.nanoTime();
     private final Deque<Long> tickIntervals = new ConcurrentLinkedDeque<>();
     private static final int TPS_SAMPLE_SIZE = 100;
 
-    // GC tracker
     private long lastGcCount = 0;
     private long lastGcTime = 0;
 
-    // Alert thresholds
     private double tpsWarningThreshold = 18.0;
     private double tpsCriticalThreshold = 15.0;
     private double memoryWarningPercent = 80.0;
     private double memoryCriticalPercent = 95.0;
     private double msptWarningThreshold = 40.0;
 
-    /**
-     * Snapshot chứa toàn bộ chỉ số tại 1 thời điểm.
-     */
     public record HealthSnapshot(
             long timestamp,
             double tps,
@@ -70,9 +48,6 @@ public class HealthMonitor {
             int entities
     ) {}
 
-    /**
-     * Cảnh báo sức khỏe hệ thống.
-     */
     public record HealthAlert(long timestamp, AlertLevel level, String category, String message) {}
 
     public enum AlertLevel {
@@ -92,12 +67,13 @@ public class HealthMonitor {
         msptWarningThreshold = plugin.getConfig().getDouble("health.mspt-warning", 40.0);
     }
 
-    /**
-     * Bắt đầu giám sát (chạy task mỗi 100 ticks = 5 giây).
-     */
+    private com.javastudio.utils.PlatformUtil.TaskHandle tickTask;
+    private com.javastudio.utils.PlatformUtil.TaskHandle snapshotTask;
+
     public void start() {
-        // TPS Counter task (chạy mỗi tick để đo chính xác)
-        plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
+        stop();
+        tickTask = com.javastudio.utils.PlatformUtil.runTaskTimer(plugin, () -> {
+            com.javastudio.security.GasMeter.advanceServerTick();
             long now = System.nanoTime();
             long interval = now - lastTickTime;
             lastTickTime = now;
@@ -108,13 +84,20 @@ public class HealthMonitor {
             }
         }, 1L, 1L);
 
-        // Snapshot collector (mỗi 5 giây)
-        plugin.getServer().getScheduler().runTaskTimer(plugin, this::collectSnapshot, 100L, 100L);
+        snapshotTask = com.javastudio.utils.PlatformUtil.runTaskTimer(plugin, this::collectSnapshot, 100L, 100L);
     }
 
-    /**
-     * Thu thập snapshot chỉ số hệ thống tại thời điểm hiện tại.
-     */
+    public void stop() {
+        if (tickTask != null) {
+            tickTask.cancel();
+            tickTask = null;
+        }
+        if (snapshotTask != null) {
+            snapshotTask.cancel();
+            snapshotTask = null;
+        }
+    }
+
     public void collectSnapshot() {
         double tps = calculateTps();
         double mspt = calculateMspt();
@@ -127,7 +110,6 @@ public class HealthMonitor {
 
         int threadCount = Thread.activeCount();
 
-        // GC stats
         long totalGcCount = 0;
         long totalGcTime = 0;
         for (GarbageCollectorMXBean gc : ManagementFactory.getGarbageCollectorMXBeans()) {
@@ -138,9 +120,8 @@ public class HealthMonitor {
         long deltaGcTime = totalGcTime - lastGcTime;
         lastGcCount = totalGcCount;
         lastGcTime = totalGcTime;
-        double gcPressure = deltaGcTime / 5000.0 * 100.0; // % thời gian GC trong 5 giây
+        double gcPressure = deltaGcTime / 5000.0 * 100.0;
 
-        // Server stats
         int onlinePlayers = plugin.getServer().getOnlinePlayers().size();
         int loadedChunks = 0;
         int entities = 0;
@@ -163,11 +144,14 @@ public class HealthMonitor {
             history.pollFirst();
         }
 
-        // Kiểm tra ngưỡng cảnh báo
         checkAlerts(snapshot);
     }
 
     private void checkAlerts(HealthSnapshot s) {
+        if (System.currentTimeMillis() - startupTime < 30000L) {
+            return;
+        }
+
         if (s.tps() < tpsCriticalThreshold) {
             addAlert(AlertLevel.CRITICAL, "TPS", String.format("TPS quá thấp: %.1f (ngưỡng: %.1f)", s.tps(), tpsCriticalThreshold));
         } else if (s.tps() < tpsWarningThreshold) {
@@ -200,7 +184,6 @@ public class HealthMonitor {
     private void addAlert(AlertLevel level, String category, String message) {
         HealthAlert alert = new HealthAlert(System.currentTimeMillis(), level, category, message);
         activeAlerts.add(alert);
-        // Giữ tối đa 50 alerts
         while (activeAlerts.size() > 50) {
             activeAlerts.remove(0);
         }
@@ -210,9 +193,6 @@ public class HealthMonitor {
         }
     }
 
-    // ========================================
-    // TPS & MSPT CALCULATION
-    // ========================================
 
     private double calculateTps() {
         if (tickIntervals.size() < 2) return 20.0;
@@ -245,41 +225,23 @@ public class HealthMonitor {
         return (double) totalNanos / count / 1_000_000.0;
     }
 
-    // ========================================
-    // API cho Web IDE Dashboard
-    // ========================================
 
-    /**
-     * Lấy snapshot mới nhất.
-     */
     public HealthSnapshot getLatestSnapshot() {
         return history.peekLast();
     }
 
-    /**
-     * Lấy lịch sử snapshot (120 mẫu = ~10 phút).
-     */
     public List<HealthSnapshot> getHistory() {
         return new ArrayList<>(history);
     }
 
-    /**
-     * Lấy danh sách cảnh báo đang hoạt động.
-     */
     public List<HealthAlert> getActiveAlerts() {
         return new ArrayList<>(activeAlerts);
     }
 
-    /**
-     * Xóa toàn bộ cảnh báo.
-     */
     public void clearAlerts() {
         activeAlerts.clear();
     }
 
-    /**
-     * Chuyển snapshot thành JSON cho REST API.
-     */
     public String toJson(HealthSnapshot s) {
         if (s == null) return "{}";
         return "{" +
@@ -299,9 +261,6 @@ public class HealthMonitor {
                 "}";
     }
 
-    /**
-     * Chuyển toàn bộ lịch sử thành JSON array.
-     */
     public String historyToJson() {
         StringBuilder sb = new StringBuilder("[");
         boolean first = true;
@@ -314,9 +273,6 @@ public class HealthMonitor {
         return sb.toString();
     }
 
-    /**
-     * Chuyển danh sách cảnh báo thành JSON.
-     */
     public String alertsToJson() {
         StringBuilder sb = new StringBuilder("[");
         boolean first = true;

@@ -11,9 +11,6 @@ import org.bukkit.entity.Player;
 
 import java.util.*;
 
-/**
- * Lệnh theo dõi và gỡ lỗi sự kiện Bukkit thời gian thực (/jspy).
- */
 public final class JSpyCommand implements CommandExecutor, TabCompleter {
 
     private final JavaStudioPlugin plugin;

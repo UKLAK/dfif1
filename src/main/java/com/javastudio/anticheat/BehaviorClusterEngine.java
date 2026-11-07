@@ -1,14 +1,12 @@
 package com.javastudio.anticheat;
 
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.Map;
 
-/**
- * Hướng 3: Bộ phân tích hành vi đa biến (Multi-Variate Heuristic Clustering).
- * Đánh giá 6 chỉ số chuyên sâu để phân loại phong cách chơi thành:
- * LEGIT_CASUAL, LEGIT_PRO, SUSPICIOUS, DEFINITE_CHEAT.
- */
 public final class BehaviorClusterEngine {
 
     private final AntiCheatManager manager;
@@ -17,76 +15,87 @@ public final class BehaviorClusterEngine {
         this.manager = manager;
     }
 
-    /**
-     * Cập nhật và phân cụm hồ sơ hành vi người chơi dựa trên 6 chiều dữ liệu.
-     */
     public void evaluatePlayer(Player p, PlayerData d) {
-        // 1. Độ lệch chuẩn khoảng thời gian Click (CPS StdDev)
+        long now = System.currentTimeMillis();
+        if (now - d.lastClusterEval < 500L) return;
+        d.lastClusterEval = now;
+
         double cpsStdDev = calculateStdDev(d.clickDelays);
         if (d.clickDelays.size() >= 8) {
             d.clusterCpsStdDev = cpsStdDev;
         }
 
-        // 2. Độ nhọn phân phối gia tốc góc quay (Yaw Kurtosis)
         double kurtosis = calculateKurtosis(d.yawDeltas);
-        if (d.yawDeltas.size() >= 15) {
+        if (d.yawDeltas.size() >= 12) {
             d.clusterKurtosis = kurtosis;
         }
 
-        // 3. Tỷ lệ khóa tâm viền Hitbox (Hitbox Proximity: 0.0 tâm, 1.0 viền ngoài)
-        if (d.lastVictimLoc != null && p.getLocation() != null) {
-            double dist = p.getLocation().distance(d.lastVictimLoc);
+        Location pLoc = p.getLocation();
+        if (d.lastVictimLoc != null && pLoc != null && pLoc.getWorld() != null
+                && d.lastVictimLoc.getWorld() == pLoc.getWorld()) {
+            double dist = pLoc.distance(d.lastVictimLoc);
             d.clusterHitboxProximity = Math.min(1.0, Math.max(0.0, (dist - 1.5) / 3.0));
         }
 
-        // 4. Độ trễ phản xạ tâm ngắm (Reaction Latency: người thật 140-280ms, cheat < 50ms)
         if (d.lastTargetSwitchTime > 0) {
-            long switchDelta = System.currentTimeMillis() - d.lastTargetSwitchTime;
+            long switchDelta = now - d.lastTargetSwitchTime;
             if (switchDelta < 1000) {
                 d.clusterReactionLatency = Math.max(20.0, (double) switchDelta);
             }
         }
 
-        // 5. Độ ổn định Ping (Ping Jitter)
         int currentPing = manager.safePing(p);
         d.pingHistory.addLast(currentPing);
         while (d.pingHistory.size() > 20) d.pingHistory.pollFirst();
         d.clusterPingJitter = calculateIntStdDev(d.pingHistory);
 
-        // 6. Độ mượt đường ngắm (Tracking Smoothness)
-        d.clusterSmoothness = Math.max(0.0, Math.min(1.0, 1.0 - (d.combatAnomalyScore * 0.8)));
+        double entropy = calculateEntropy(d.yawDeltas);
+        double smoothnessFromAnomaly = Math.max(0.0, Math.min(1.0, 1.0 - (d.combatAnomalyScore * 0.75)));
+        if (entropy < 1.8 && d.yawDeltas.size() >= 10) {
+            smoothnessFromAnomaly = Math.max(0.1, smoothnessFromAnomaly * 0.6);
+        }
+        d.clusterSmoothness = smoothnessFromAnomaly;
 
-        // ============================================================
-        //  THUẬT TOÁN PHÂN CỤM (HEURISTIC CLUSTERING)
-        // ============================================================
         int cps = d.clicks.size();
 
-        if (d.clusterCpsStdDev < 5.0 && cps >= 13 && d.clickDelays.size() >= 12) {
-            // Gian lận Autoclicker / Macro hoàn hảo
+        if (d.clusterCpsStdDev < 4.2 && cps >= 14 && d.clickDelays.size() >= 14) {
             d.clusterGroup = PlayerData.ClusterGroup.DEFINITE_CHEAT;
-        } else if (d.combatAnomalyScore >= 0.75 && d.clusterReactionLatency < 50.0) {
-            // Gian lận Killaura / Aimbot khóa tâm tức thì
+        } else if (d.combatAnomalyScore >= 0.78 && d.clusterReactionLatency < 50.0) {
             d.clusterGroup = PlayerData.ClusterGroup.DEFINITE_CHEAT;
-        } else if (d.combatAnomalyScore >= 0.50 || (d.clusterCpsStdDev < 10.0 && cps >= 11)) {
-            // Nghi vấn sử dụng hỗ trợ ngắm hoặc clicker có jitter nhẹ
+        } else if (d.combatAnomalyScore >= 0.52 || (d.clusterCpsStdDev < 8.0 && cps >= 12)) {
             d.clusterGroup = PlayerData.ClusterGroup.SUSPICIOUS;
-        } else if (cps >= 10 && d.clusterCpsStdDev >= 16.0 && d.clusterReactionLatency >= 130.0) {
-            // Game thủ Pro (tốc độ tay cao nhưng sai số sinh học hoàn toàn tự nhiên)
+        } else if (cps >= 10 && d.clusterCpsStdDev >= 14.0 && d.clusterReactionLatency >= 110.0) {
             d.clusterGroup = PlayerData.ClusterGroup.LEGIT_PRO;
         } else {
-            // Người chơi thông thường
             d.clusterGroup = PlayerData.ClusterGroup.LEGIT_CASUAL;
         }
     }
 
+    public double calculateEntropy(ArrayDeque<Float> samples) {
+        if (samples.size() < 5) return 3.0;
+        Map<Integer, Integer> freq = new HashMap<>();
+        for (float s : samples) {
+            int bin = (int) Math.floor(Math.abs(s) * 2.0);
+            freq.put(bin, freq.getOrDefault(bin, 0) + 1);
+        }
+        double entropy = 0.0;
+        int n = samples.size();
+        for (int count : freq.values()) {
+            double p = (double) count / n;
+            entropy -= p * (Math.log(p) / Math.log(2));
+        }
+        return entropy;
+    }
+
     private double calculateStdDev(ArrayDeque<Long> samples) {
-        if (samples.size() < 3) return 25.0; // Mặc định tự nhiên
+        if (samples.size() < 3) return 25.0;
         double sum = 0.0;
         for (long s : samples) sum += s;
         double mean = sum / samples.size();
         double variance = 0.0;
         for (long s : samples) {
-            variance += Math.pow(s - mean, 2);
+            double diff = s - mean;
+            variance += diff * diff;
         }
         return Math.sqrt(variance / samples.size());
     }
@@ -98,7 +107,8 @@ public final class BehaviorClusterEngine {
         double mean = sum / samples.size();
         double variance = 0.0;
         for (int s : samples) {
-            variance += Math.pow(s - mean, 2);
+            double diff = s - mean;
+            variance += diff * diff;
         }
         return Math.sqrt(variance / samples.size());
     }
@@ -113,12 +123,13 @@ public final class BehaviorClusterEngine {
         double m4 = 0.0;
         for (float s : samples) {
             double diff = s - mean;
-            m2 += Math.pow(diff, 2);
-            m4 += Math.pow(diff, 4);
+            double d2 = diff * diff;
+            m2 += d2;
+            m4 += d2 * d2;
         }
         int n = samples.size();
         double variance = m2 / n;
         if (variance < 0.0001) return 3.0;
-        return (m4 / n) / Math.pow(variance, 2);
+        return (m4 / n) / (variance * variance);
     }
 }

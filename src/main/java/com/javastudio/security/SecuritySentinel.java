@@ -6,14 +6,6 @@ import com.javastudio.security.exploit.ExploitGuard;
 
 import java.util.*;
 
-/**
- * Trung Tâm Chỉ Huy An Ninh & Phòng Thủ Toàn Diện (Security Sentinel Nexus).
- * Hợp nhất 4 phân hệ bảo mật thành 1 thể thống nhất:
- * 1. Security Sandbox (Hộp cát chạy mã & timeout)
- * 2. Security Scanner (Quét backdoor, RCE & chuỗi Base64 độc)
- * 3. Exploit Guard (Chặn packet crash, NBT, book crash, tọa độ vô cực)
- * 4. Bytecode Inspector (Mổ xẻ & dịch ngược class bytecode)
- */
 public final class SecuritySentinel {
 
     private final JavaStudioPlugin plugin;
@@ -43,9 +35,6 @@ public final class SecuritySentinel {
         this.bytecodeInspector = bytecodeInspector;
     }
 
-    /**
-     * Thực hiện kiểm toán toàn diện an ninh hệ thống (Full Security Audit).
-     */
     public SecurityReport performAudit() {
         int score = 100;
         List<String> recs = new ArrayList<>();
@@ -62,13 +51,11 @@ public final class SecuritySentinel {
             recs.add("Nên kích hoạt ExploitGuard để chặn sách độc, packet flood, swap macro và tọa độ vô cực.");
         }
 
-        // Kiểm tra cấu hình Discord Webhook
         String discordUrl = plugin.getConfig().getString("discord.webhook-url", "");
         if (discordUrl == null || discordUrl.isBlank()) {
             recs.add("Khuyến nghị cấu hình Discord Webhook để nhận cảnh báo tức thời khi phát hiện Exploit hoặc dò mật khẩu.");
         }
 
-        // Kiểm tra nguy cơ BungeeCord / Velocity UUID Spoofing Port Hijacking
         try {
             boolean isBungee = org.bukkit.Bukkit.spigot().getConfig().getBoolean("settings.bungeecord", false);
             boolean isOnlineMode = org.bukkit.Bukkit.getOnlineMode();
@@ -81,7 +68,6 @@ public final class SecuritySentinel {
             }
         } catch (Throwable ignored) {}
 
-        // Kiểm tra phòng thủ Panel & Wings CVEs (Crafty Controller & Pterodactyl Panel)
         int panelBlocked = 0;
         if (plugin.getPanelCveProtection() != null) {
             var cveReport = plugin.getPanelCveProtection().performCveAudit();
@@ -94,11 +80,9 @@ public final class SecuritySentinel {
             }
         }
 
-        // Đếm tổng số vi phạm / rủi ro
         int blockedExploits = (exploitGuard != null ? (int) exploitGuard.getStats().getPacketsBlocked() : 0) + panelBlocked;
         int highRiskFindings = 0;
 
-        // Quét nhanh toàn bộ các file JAR plugin trong server
         if (scanner != null) {
             List<SecurityScanner.ScanReport> reports = scanner.scanAllPlugins();
             for (SecurityScanner.ScanReport rep : reports) {

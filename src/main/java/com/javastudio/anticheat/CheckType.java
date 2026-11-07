@@ -1,12 +1,7 @@
 package com.javastudio.anticheat;
 
-/**
- * Danh sách toàn bộ các check của module Anti-Cheat.
- * Mỗi check có khóa cấu hình (anticheat.checks.&lt;key&gt;), nhóm, tên hiển thị và ngưỡng vi phạm (VL) mặc định.
- */
 public enum CheckType {
 
-    // ===== Di chuyển =====
     SPEED("speed", Category.MOVEMENT, "Speed", 14, true, false),
     FLY("fly", Category.MOVEMENT, "Fly", 10, true, false),
     JUMP("jump", Category.MOVEMENT, "HighJump/Step", 10, true, false),
@@ -24,19 +19,17 @@ public enum CheckType {
     BLINK("blink", Category.MOVEMENT, "Blink/Disabler", 8, true, false),
     PHYSICS("physics", Category.MOVEMENT, "PhysicsSimulation", 10, true, false),
 
-    // ===== Chiến đấu =====
     REACH("reach", Category.COMBAT, "Reach", 10, false, true),
     KILLAURA("killaura", Category.COMBAT, "KillAura", 10, false, true),
     WALLHIT("wallhit", Category.COMBAT, "HitThroughWall", 8, false, true),
     AIM("aim", Category.COMBAT, "AimAssist", 12, false, false),
     AUTOCLICKER("autoclicker", Category.COMBAT, "AutoClicker", 12, false, false),
     NOSWING("noswing", Category.COMBAT, "NoSwing", 10, false, false),
-    CRITICALS("criticals", Category.COMBAT, "Criticals", 10, false, false),
+    CRITICALS("criticals", Category.COMBAT, "Criticals", 10, false, true),
     MULTIACTIONS("multiactions", Category.COMBAT, "MultiActions", 10, false, true),
     HITBOX("hitbox", Category.COMBAT, "HitboxExpand", 8, false, true),
     AUTOTOTEM("autototem", Category.COMBAT, "AutoTotem", 6, false, true),
 
-    // ===== Thế giới / Người chơi =====
     FASTBREAK("fastbreak", Category.WORLD, "FastBreak", 10, false, true),
     NUKER("nuker", Category.WORLD, "Nuker", 8, false, true),
     FASTPLACE("fastplace", Category.WORLD, "FastPlace", 10, false, true),

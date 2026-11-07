@@ -14,11 +14,6 @@ import org.bukkit.entity.Player;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Trình Quản Lý Debug HUD Trực Quan Thời Gian Thực (In-Game Realtime Performance HUD).
- * Hiển thị TPS, MSPT (độ trễ tick), RAM, Chunks nạp, Thực thể và Dynamic Plugins trực tiếp
- * trên thanh Action Bar hoặc Boss Bar của Admin.
- */
 public final class DebugHudManager {
 
     public enum HudMode {
@@ -42,7 +37,6 @@ public final class DebugHudManager {
             taskHandle.cancel();
         }
 
-        // Cập nhật mỗi 20 ticks (1 giây)
         this.taskHandle = PlatformUtil.runTaskTimer(plugin, this::tickHud, 20L, 20L);
     }
 
@@ -66,7 +60,6 @@ public final class DebugHudManager {
 
         int activeDynPlugins = plugin.getPluginManager() != null ? plugin.getPluginManager().getActivePlugins().size() : 0;
 
-        // Mã màu theo hiệu năng
         String tpsColor = tps >= 19.5 ? "§a" : (tps >= 17.0 ? "§e" : "§c");
         String msptColor = mspt <= 30.0 ? "§a" : (mspt <= 45.0 ? "§e" : "§c");
         double ramRatio = mem.maxMb() > 0 ? ((double) mem.usedMb() / mem.maxMb()) : 0.0;

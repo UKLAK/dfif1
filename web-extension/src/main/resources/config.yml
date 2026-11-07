@@ -1,0 +1,39 @@
+# ==============================================================
+# JAVASTUDIO WEB EXTENSION - CAU HINH CONG QUAN TRI WEB & IDE
+# Luu y: Plugin mo rong nay yeu cau plugin mac dinh 'JavaStudio'
+# phai duoc cai dat va kich hoat tren may chu.
+# ==============================================================
+web-dashboard:
+  enabled: true
+
+  # ============================================================
+  # CHE DO HOSTING PANEL 1-PORT (Pterodactyl, Pelican, Crafty...)
+  # Khi thue host / panel chi duoc cap DUY NHAT 1 PORT (cong ket noi
+  # Minecraft chinh), plugin se tu dong gop luu luong HTTP Web IDE &
+  # Live Radar di chung ngay tren cong Minecraft do ma khong anh huong
+  # den ping hay nguoi choi trong game!
+  # - "auto": Tu dong bat che do 1-Port tren Panel/Docker hoac khi cong 8085 ban
+  # - "true": Luon bat che do 1-Port (chi dung cong Minecraft chinh, 0 mo port phu)
+  # - "false": Tat gop cong, chi mo tren bind-address:port ben duoi (danh cho PC/VPS nhieu port)
+  # ============================================================
+  single-port: "auto"
+
+  # Ten mien hoac IP cong khai cua Panel (VD: "play.myserver.vn" hoac "103.82.x.x").
+  # Bo trong "" de plugin TU DONG hoc IP/Domain tu ket noi nguoi choi hoac bien moi truong Panel!
+  public-host: ""
+
+  # Cong cong khai ben ngoai Panel neu khac cong noi bo container (0 = tu dong nhan dien)
+  public-port: 0
+
+  # Giao thuc hien thi duong dan ("http" hoac "https" neu co Reverse Proxy SSL)
+  public-scheme: "http"
+
+  # Cong HTTP doc lap khi chay tren may ca nhan (PC) hoac khi single-port: "false"
+  port: 8085
+
+  # 127.0.0.1 = chi truy cap noi bo tren may chu (an toan nhat).
+  # Dat "0.0.0.0" hoac "*" de mo port phu ra mang ngoai tren VPS nhieu port.
+  bind-address: "127.0.0.1"
+
+  # De trong de tu dong dong bo tu JavaStudio hoac sinh ngau nhien token 48 ky tu.
+  auth-token: ""

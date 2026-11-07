@@ -10,9 +10,6 @@ import org.bukkit.command.CommandSender;
 
 import java.util.*;
 
-/**
- * Quản lý việc tiêm (inject) và gỡ bỏ các lệnh động trực tiếp vào CommandMap của Bukkit.
- */
 public class DynamicCommandManager {
 
     private final JavaStudioPlugin plugin;
@@ -28,9 +25,6 @@ public class DynamicCommandManager {
         return brigadierEngine;
     }
 
-    /**
-     * Đăng ký một DynamicCommand vào Bukkit CommandMap.
-     */
     public synchronized boolean registerDynamicCommand(DynamicPlugin owner, String name, String description, String usage, List<String> aliases, DynamicCommand command) {
         CommandMap map = ReflectionUtil.getCommandMap();
         if (map == null) {
@@ -41,7 +35,6 @@ public class DynamicCommandManager {
         String fallbackPrefix = owner != null ? owner.getName().toLowerCase() : "javastudio";
         DynamicCommandWrapper wrapper = new DynamicCommandWrapper(name, description, usage, aliases, command, fallbackPrefix);
 
-        // Gỡ bỏ lệnh cũ nếu trùng tên do chính JavaStudio đã đăng ký
         unregisterDynamicCommand(name);
 
         boolean registered = map.register(fallbackPrefix, wrapper);
@@ -53,9 +46,6 @@ public class DynamicCommandManager {
         return registered;
     }
 
-    /**
-     * Gỡ bỏ an toàn một lệnh động đã đăng ký bởi JavaStudio, không ảnh hưởng plugin khác.
-     */
     public synchronized boolean unregisterDynamicCommand(String name) {
         String lower = name.toLowerCase();
         DynamicCommandWrapper wrapper = registeredWrappers.remove(lower);
@@ -67,9 +57,6 @@ public class DynamicCommandManager {
         return false;
     }
 
-    /**
-     * Gỡ bỏ toàn bộ lệnh động khi JavaStudio hoặc dynamic plugin bị tắt.
-     */
     public synchronized void unregisterAll() {
         for (String name : new ArrayList<>(registeredWrappers.keySet())) {
             unregisterDynamicCommand(name);
@@ -78,9 +65,6 @@ public class DynamicCommandManager {
         brigadierEngine.syncAllPlayers();
     }
 
-    /**
-     * Lớp cầu nối giữa Bukkit Command và DynamicCommand.
-     */
     public static class DynamicCommandWrapper extends Command {
 
         private final DynamicCommand handler;

@@ -10,12 +10,6 @@ import org.bukkit.entity.Player;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Hướng 3: Hệ Thống Ban Theo Đợt (Ban Wave) & Discord Rich Evidence Report.
- * Trì hoãn xử phạt ngay lập tức để hacker không biết chính xác thuật toán nào vừa bắt họ;
- * gom các đối tượng vi phạm 100% vào hàng đợi và thực thi thanh trừng đồng loạt theo chu kỳ
- * (ví dụ 45 phút/lần hoặc thủ công qua lệnh /jac wave execute).
- */
 public final class BanWaveManager {
 
     private final JavaStudioPlugin plugin;
@@ -82,9 +76,6 @@ public final class BanWaveManager {
         return queue.size();
     }
 
-    /**
-     * Đưa người chơi vào hàng đợi Ban Wave khi có vi phạm chắc chắn 100%.
-     */
     public boolean queuePlayer(Player p, CheckType check, String reason, double vl) {
         if (!enabled || p == null) return false;
         PlayerData d = manager.peek(p.getUniqueId());
@@ -97,7 +88,6 @@ public final class BanWaveManager {
         BanEntry entry = new BanEntry(p.getUniqueId(), p.getName(), check, reason, vl, System.currentTimeMillis());
         queue.put(p.getUniqueId(), entry);
 
-        // Gửi báo cáo bằng chứng vi phạm ngay về Discord nếu có Webhook
         sendDiscordEvidence(entry, p);
         return true;
     }
@@ -123,9 +113,6 @@ public final class BanWaveManager {
         queue.clear();
     }
 
-    /**
-     * Thực thi thanh trừng toàn bộ hàng đợi Ban Wave.
-     */
     public int executeWave(CommandSender staff) {
         if (queue.isEmpty()) {
             MessageUtil.sendInfo(staff, "Hàng đợi Ban Wave hiện đang trống!");
@@ -136,7 +123,6 @@ public final class BanWaveManager {
         List<BanEntry> targets = new ArrayList<>(queue.values());
         clearQueue();
 
-        // Phát sóng thông điệp hoành tráng tới toàn server
         MessageUtil.broadcast("&b╔════════════════════════════════════════════════════╗");
         MessageUtil.broadcast("&b║   &c&lJAVA-STUDIO BAN-WAVE ACTIVATED               &b║");
         MessageUtil.broadcast("&b║   &eĐợt thanh trừng tự động đã xử lý &c&l" + count + " &eđối tượng!   &b║");
@@ -162,9 +148,6 @@ public final class BanWaveManager {
         return count;
     }
 
-    /**
-     * Xuất báo cáo chứng cứ vi phạm chi tiết về Discord Webhook.
-     */
     private void sendDiscordEvidence(BanEntry entry, Player p) {
         if (!plugin.getSettingsManager().isDiscordWebhookEnabled() || plugin.getDiscordWebhook() == null) return;
         try {

@@ -14,9 +14,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Lệnh quản lý giấy phép bản quyền và chống rò rỉ mã nguồn (/jlicense).
- */
 public class JLicenseCommand implements CommandExecutor, TabCompleter {
 
     private final JavaStudioPlugin plugin;

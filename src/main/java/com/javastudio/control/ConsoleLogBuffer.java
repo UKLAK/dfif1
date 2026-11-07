@@ -2,21 +2,19 @@ package com.javastudio.control;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 
-/**
- * Bộ đệm lưu trữ nhật ký console máy chủ (Console Log Buffer).
- * Ghi lại các dòng log từ Server Console vào bộ đệm vòng tròn (Ring Buffer)
- * để truyền phát thời gian thực tới Web Terminal trên Web IDE.
- */
 public class ConsoleLogBuffer {
 
     public record LogEntry(long id, long timestamp, String level, String message) {}
 
     private static final int MAX_ENTRIES = 600;
     private final ConcurrentLinkedDeque<LogEntry> buffer = new ConcurrentLinkedDeque<>();
+    private final CopyOnWriteArrayList<Consumer<LogEntry>> listeners = new CopyOnWriteArrayList<>();
     private long idCounter = 0;
     private Handler attachedHandler;
 
@@ -49,10 +47,24 @@ public class ConsoleLogBuffer {
     public synchronized void addLog(String level, String message) {
         long id = ++idCounter;
         String sanitized = com.javastudio.security.cve.SensitiveLogRedactor.redact(message);
-        buffer.addLast(new LogEntry(id, System.currentTimeMillis(), level, sanitized));
+        LogEntry entry = new LogEntry(id, System.currentTimeMillis(), level, sanitized);
+        buffer.addLast(entry);
         while (buffer.size() > MAX_ENTRIES) {
             buffer.pollFirst();
         }
+        for (var l : listeners) {
+            try {
+                l.accept(entry);
+            } catch (Throwable ignored) {}
+        }
+    }
+
+    public void addLogListener(Consumer<LogEntry> listener) {
+        if (listener != null) listeners.add(listener);
+    }
+
+    public void removeLogListener(Consumer<LogEntry> listener) {
+        if (listener != null) listeners.remove(listener);
     }
 
     public List<LogEntry> getLogsSince(long lastId) {

@@ -8,9 +8,6 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
-/**
- * Event Listener chặn và điều hướng tương tác trên SmartGui an toàn, chống ghost item.
- */
 public class SmartGuiListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)

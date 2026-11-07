@@ -21,10 +21,6 @@ commands:
     usage: /jexec [-a] [-t] <code...>
     aliases: [java]
     permission: javastudio.admin
-  java:
-    description: Alias cua jexec
-    usage: /java <code...>
-    permission: javastudio.admin
   jplugin:
     description: Tao, bien dich, nap va quan ly cac Dynamic Plugin
     usage: /jplugin <create|compile|load|unload|reload|list|templates|info>
@@ -33,7 +29,7 @@ commands:
   jscript:
     description: Quan ly va chay cac file script Java doc lap
     usage: /jscript <run|list|new>
-    aliases: [js]
+    aliases: [jscr, script]
     permission: javastudio.admin
   javastudio:
     description: Lenh he thong kiem tra thong tin va reload cau hinh
@@ -43,15 +39,7 @@ commands:
   jcontrol:
     description: Kiem soat toan bo plugins (PlugManX) va dieu khien software may chu
     usage: /jcontrol <list|info|enable|disable|load|unload|reload|status|gc|purge|save>
-    aliases: [jpm, plugman]
-    permission: javastudio.admin
-  jpm:
-    description: Alias quan ly toan bo plugin tren server (PlugManX)
-    usage: /jpm <list|info|enable|disable|load|unload|reload|usage>
-    permission: javastudio.admin
-  jserver:
-    description: Alias giam sat va dieu khien toan bo software may chu
-    usage: /jserver <status|gc|purge|save|cmd>
+    aliases: [jpm, plugman, jserver]
     permission: javastudio.admin
   jnetwork:
     description: Dieu khien mang da server va dong bo Redis
@@ -61,7 +49,7 @@ commands:
   jexploit:
     description: Giam sat va dieu khien he thong bao ve chong Exploit (ExploitFixer)
     usage: /jexploit <status|stats|violations|clear|toggle|reload>
-    aliases: [jprotect, exploitfixer]
+    aliases: [exploitfixer, jexp]
     permission: javastudio.admin
   jhud:
     description: Bat tat thanh Debug HUD thoi gian thuc hien thi TPS, MSPT, RAM, Chunks
@@ -76,7 +64,7 @@ commands:
   jsecurity:
     description: Trung tam chi huy an ninh toan dien hop nhat (Security Sentinel)
     usage: /jsecurity <status|audit|scan|inspect|exploit>
-    aliases: [jprotect]
+    aliases: [jprotect, jsec]
     permission: javastudio.admin
   jdiag:
     description: Chan doan va giam sat hieu nang hop nhat (Telemetry Nexus)
@@ -138,31 +126,58 @@ commands:
     usage: /jtrace <hook|watch|stop|breakers|dump|reset|config>
     aliases: [jt, jbreaker]
     permission: javastudio.admin
-  jt:
-    description: Alias cua jtrace
-    usage: /jt <hook|watch|stop|breakers|dump|reset|config>
-    permission: javastudio.admin
-  jbreaker:
-    description: Alias quan ly Circuit Breaker
-    usage: /jbreaker <breakers|reset|config>
-    permission: javastudio.admin
   jchunk:
     description: Engine thao tac khoi sieu toc va phuc hoi ban do dau truong trong RAM
     usage: /jchunk <pos1|pos2|fill|replace|snapshot|restore|list|delete>
     aliases: [jc, jarena]
     permission: javastudio.admin
-  jc:
-    description: Alias cua jchunk
-    usage: /jc <pos1|pos2|fill|replace|snapshot|restore|list|delete>
-    permission: javastudio.admin
-  jarena:
-    description: Alias quan ly snapshot dau truong RAM
-    usage: /jarena <snapshot|restore|list>
-    permission: javastudio.admin
   report:
     description: To cao nguoi choi nghi van su dung gian lan (Auto Investigation)
     usage: /report <nguoi_choi> <ly do>
     aliases: [tocao]
+  jmesh:
+    description: Dieu khien mang phan tan P2P Mesh Network va Raft consensus
+    usage: /jmesh [status|nodes|broadcast]
+    permission: javastudio.admin
+  jflow:
+    description: Quan ly va thuc thi cac kich ban Visual Logic Flow
+    usage: /jflow [list|run|reload]
+    permission: javastudio.admin
+  jprefetch:
+    description: Dieu khien he thong Async Chunk Prefetcher theo vector di chuyen
+    usage: /jprefetch [status|toggle|stats|reset]
+    aliases: [prefetch]
+    permission: javastudio.admin
+  jgui:
+    description: Visual In-Game GUI Designer keo tha va sinh ma Java SmartGui
+    usage: /jgui <designer|open|export|list|delete>
+    aliases: [smartgui, jguidesigner]
+    permission: javastudio.admin
+  jgit:
+    description: Time-Travel Snapshot va Rollback ma nguon dynamic plugins
+    usage: /jgit <snapshot|rollback|list|diff>
+    aliases: [git, jsnapshot]
+    permission: javastudio.admin
+  jmock:
+    description: Gia lap ban su kien Bukkit Events in-game phuc vu kiem thu
+    usage: /jmock event <Tên_Event> [tham_so]
+    aliases: [mock, jtestevent]
+    permission: javastudio.admin
+  jdb:
+    description: Quan tri va truy van truc tiep SQLite DataStore cua Dynamic Plugins
+    usage: /jdb <query|inspect|keys> <tên_plugin> [sql...]
+    aliases: [db, jsqlite]
+    permission: javastudio.admin
+  jbench:
+    description: Kiem tra, cham diem phan cung va danh gia do chiu tai cua may chu
+    usage: /jbench [run|quick|full|report|info]
+    aliases: [jbenchmark, jtest, servertest]
+    permission: javastudio.admin
+  js:
+    description: Universal Master Command dieu khien moi phan he JavaStudio
+    usage: /js <phân_hệ> <args...>
+    aliases: [j]
+    permission: javastudio.admin
 
 permissions:
   javastudio.admin:

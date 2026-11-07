@@ -1,6 +1,8 @@
 package com.javastudio.api;
 
 import com.javastudio.JavaStudioPlugin;
+import com.javastudio.api.item.ComponentItemHelper;
+import com.javastudio.api.item.ItemBuilder;
 import com.javastudio.control.PluginController;
 import com.javastudio.control.ServerController;
 import com.javastudio.utils.MessageUtil;
@@ -18,15 +20,9 @@ import org.bukkit.util.RayTraceResult;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * Lớp cơ sở mở rộng (Supercharged Script Base Class) cung cấp sẵn toàn bộ các hàm
- * tiện ích của thế giới Minecraft để lập trình 1 dòng hoặc chạy script trực tiếp mà
- * không cần phải gõ các chuỗi import hay gọi hàm Bukkit rườm rà.
- */
 @SuppressWarnings("deprecation")
 public abstract class QuickScript implements DynamicScript {
 
-    // --- Biến môi trường trực tiếp ---
     public JavaContext ctx;
     public CommandSender sender;
     public Player player;
@@ -60,18 +56,9 @@ public abstract class QuickScript implements DynamicScript {
         return run();
     }
 
-    /**
-     * Thân hàm thực thi của script.
-     */
     public abstract Object run() throws Throwable;
 
-    // ==========================================
-    // 1. CÁC HÀM TIỆN ÍCH NGƯỜI CHƠI (PLAYER HELPERS)
-    // ==========================================
 
-    /**
-     * Hồi phục tối đa máu, thanh thức ăn, tắt lửa và xóa hiệu ứng xấu.
-     */
     public String heal() {
         return heal(player);
     }
@@ -91,9 +78,6 @@ public abstract class QuickScript implements DynamicScript {
         return "Đã hồi phục hoàn toàn máu và thức ăn cho " + target.getName();
     }
 
-    /**
-     * Làm đầy thanh thức ăn.
-     */
     public String feed() {
         if (player != null) {
             player.setFoodLevel(20);
@@ -104,9 +88,6 @@ public abstract class QuickScript implements DynamicScript {
         return "Không có người chơi!";
     }
 
-    /**
-     * Bật/Tắt chế độ bất tử (God mode).
-     */
     public boolean god() {
         if (player == null) return false;
         boolean newState = !player.isInvulnerable();
@@ -115,9 +96,6 @@ public abstract class QuickScript implements DynamicScript {
         return newState;
     }
 
-    /**
-     * Bật/Tắt chế độ bay.
-     */
     public boolean fly() {
         if (player == null) return false;
         boolean newState = !player.getAllowFlight();
@@ -127,9 +105,6 @@ public abstract class QuickScript implements DynamicScript {
         return newState;
     }
 
-    /**
-     * Thay đổi GameMode nhanh (0=Survival, 1=Creative, 2=Adventure, 3=Spectator hoặc String).
-     */
     public GameMode gm(Object mode) {
         if (player == null || mode == null) return null;
         GameMode gm = parseGameMode(mode);
@@ -141,9 +116,6 @@ public abstract class QuickScript implements DynamicScript {
         return null;
     }
 
-    /**
-     * Thay đổi tốc độ đi bộ / bay (0.2 mặc định, từ 0.1 đến 1.0).
-     */
     public float speed(float speedVal) {
         if (player == null) return 0.2f;
         float clamped = Math.max(0.0f, Math.min(1.0f, speedVal));
@@ -153,9 +125,6 @@ public abstract class QuickScript implements DynamicScript {
         return clamped;
     }
 
-    /**
-     * Xóa sạch túi đồ (Inventory).
-     */
     public String clearInv() {
         if (player != null) {
             player.getInventory().clear();
@@ -165,9 +134,6 @@ public abstract class QuickScript implements DynamicScript {
         return "Không có người chơi!";
     }
 
-    /**
-     * Trao item cho người chơi theo tên Material hoặc ItemStack.
-     */
     public ItemStack give(Object itemOrMaterial, int amount) {
         return give(player, itemOrMaterial, amount);
     }
@@ -183,9 +149,6 @@ public abstract class QuickScript implements DynamicScript {
         return null;
     }
 
-    /**
-     * Tạo một ItemStack tùy chỉnh tên hiển thị và Lore nhanh chóng.
-     */
     public ItemStack item(String materialName, int amount, String displayName, String... lore) {
         Material mat = parseMaterial(materialName);
         if (mat == null) mat = Material.STONE;
@@ -204,9 +167,35 @@ public abstract class QuickScript implements DynamicScript {
         return is;
     }
 
-    /**
-     * Cộng cấp độ kinh nghiệm (Levels).
-     */
+    public ItemBuilder itemBuilder(String materialName) {
+        Material mat = parseMaterial(materialName);
+        return ItemBuilder.of(mat != null ? mat : Material.STONE);
+    }
+
+    public ItemBuilder itemBuilder(Material material) {
+        return ItemBuilder.of(material);
+    }
+
+    public ItemStack setMaxStack(ItemStack item, int maxStack) {
+        ComponentItemHelper.setMaxStackSize(item, maxStack);
+        return item;
+    }
+
+    public ItemStack setRarity(ItemStack item, String rarity) {
+        ComponentItemHelper.setRarity(item, rarity);
+        return item;
+    }
+
+    public ItemStack setFireResistant(ItemStack item, boolean fireResistant) {
+        ComponentItemHelper.setFireResistant(item, fireResistant);
+        return item;
+    }
+
+    public ItemStack setGlint(ItemStack item, boolean glint) {
+        ComponentItemHelper.setGlintOverride(item, glint);
+        return item;
+    }
+
     public int exp(int levels) {
         if (player != null) {
             player.giveExpLevels(levels);
@@ -216,9 +205,6 @@ public abstract class QuickScript implements DynamicScript {
         return 0;
     }
 
-    /**
-     * Gửi tiêu đề màn hình lớn (Title & Subtitle).
-     */
     public String title(String titleText, String subtitleText) {
         return title(titleText, subtitleText, 10, 50, 10);
     }
@@ -231,9 +217,6 @@ public abstract class QuickScript implements DynamicScript {
         return "Không có người chơi!";
     }
 
-    /**
-     * Gửi thanh thông báo Action Bar phía trên thanh máu.
-     */
     public String actionbar(String message) {
         if (player != null && message != null) {
             try {
@@ -250,9 +233,6 @@ public abstract class QuickScript implements DynamicScript {
         return "Không có người chơi!";
     }
 
-    /**
-     * Gửi tin nhắn có định dạng màu sắc cho người gọi.
-     */
     public String msg(String message) {
         if (sender != null) {
             MessageUtil.send(sender, message);
@@ -261,9 +241,6 @@ public abstract class QuickScript implements DynamicScript {
         return null;
     }
 
-    /**
-     * Phát sóng tin nhắn cho toàn bộ server.
-     */
     public String broadcast(String message) {
         for (Player pl : Bukkit.getOnlinePlayers()) {
             MessageUtil.sendRaw(pl, message);
@@ -272,9 +249,6 @@ public abstract class QuickScript implements DynamicScript {
         return "Broadcast: " + message;
     }
 
-    /**
-     * Phát âm thanh cho người chơi.
-     */
     public Sound sound(Object soundObj) {
         return sound(soundObj, 1.0f, 1.0f);
     }
@@ -289,9 +263,6 @@ public abstract class QuickScript implements DynamicScript {
         return null;
     }
 
-    /**
-     * Phát âm thanh cho tất cả người chơi trên server.
-     */
     public Sound soundAll(Object soundObj) {
         Sound s = parseSound(soundObj);
         if (s != null) {
@@ -303,9 +274,6 @@ public abstract class QuickScript implements DynamicScript {
         return null;
     }
 
-    /**
-     * Tạo hiệu ứng hạt (Particles).
-     */
     public Particle particle(Object particleObj, int count) {
         return particle(particleObj, location != null ? location : new Location(world, 0, 70, 0), count);
     }
@@ -320,13 +288,6 @@ public abstract class QuickScript implements DynamicScript {
         return null;
     }
 
-    /**
-     * Thêm hiệu ứng độc dược / thuốc (Potion Effect).
-     *
-     * @param effectName Tên hiệu ứng (ví dụ: "speed", "strength", "jump", "invisibility", "glowing")
-     * @param seconds    Thời gian kéo dài (giây)
-     * @param amplifier  Cấp độ (1, 2, 3...)
-     */
     public PotionEffectType effect(String effectName, int seconds, int amplifier) {
         return effect(player, effectName, seconds, amplifier);
     }
@@ -357,9 +318,6 @@ public abstract class QuickScript implements DynamicScript {
         return count;
     }
 
-    // ==========================================
-    // 2. CÁC HÀM DỊCH CHUYỂN & VỊ TRÍ (TELEPORTATION)
-    // ==========================================
 
     public Location tp(double x, double y, double z) {
         if (player != null && world != null) {
@@ -412,9 +370,6 @@ public abstract class QuickScript implements DynamicScript {
         return null;
     }
 
-    // ==========================================
-    // 3. CÁC HÀM THẾ GIỚI, THỜI TIẾT & BLOCKS
-    // ==========================================
 
     public String time(long ticks) {
         if (world != null) {
@@ -461,9 +416,6 @@ public abstract class QuickScript implements DynamicScript {
         return null;
     }
 
-    /**
-     * Đánh sét xuống vị trí con trỏ nhìn tới hoặc vị trí hiện tại.
-     */
     public Location lightning() {
         Location strikeLoc = targetLocation();
         if (strikeLoc == null && location != null) {
@@ -492,9 +444,6 @@ public abstract class QuickScript implements DynamicScript {
         return lightning(targetLoc);
     }
 
-    /**
-     * Lấy Block mà người chơi đang nhìn vào (tối đa 100 blocks).
-     */
     public Block targetBlock() {
         if (player == null) return null;
         try {
@@ -509,9 +458,6 @@ public abstract class QuickScript implements DynamicScript {
         return b != null ? b.getLocation() : null;
     }
 
-    /**
-     * Lấy Entity mà người chơi đang nhắm mắt vào.
-     */
     public Entity targetEntity() {
         if (player == null) return null;
         RayTraceResult r = player.getWorld().rayTraceEntities(
@@ -523,9 +469,6 @@ public abstract class QuickScript implements DynamicScript {
         return r != null ? r.getHitEntity() : null;
     }
 
-    /**
-     * Đặt khối Block tại vị trí con trỏ nhìn vào.
-     */
     public Block setBlock(Object materialObj) {
         Block b = targetBlock();
         if (b != null) {
@@ -550,13 +493,7 @@ public abstract class QuickScript implements DynamicScript {
         return null;
     }
 
-    // ==========================================
-    // 4. CÁC HÀM SPAWN & QUẢN LÝ THỰC THỂ (ENTITIES)
-    // ==========================================
 
-    /**
-     * Triệu hồi (Spawn) thực thể tại vị trí nhắm tới hoặc vị trí người chơi.
-     */
     public Entity spawn(Object entityTypeObj) {
         return spawn(entityTypeObj, 1);
     }
@@ -579,9 +516,6 @@ public abstract class QuickScript implements DynamicScript {
         return last;
     }
 
-    /**
-     * Lấy danh sách các Entities xung quanh người chơi trong bán kính radius blocks.
-     */
     public List<Entity> nearby(double radius) {
         if (location == null || world == null) return Collections.emptyList();
         return new ArrayList<>(world.getNearbyEntities(location, radius, radius, radius));
@@ -595,9 +529,6 @@ public abstract class QuickScript implements DynamicScript {
         return nearby(radius).stream().filter(e -> e instanceof Monster).map(e -> (Monster) e).collect(Collectors.toList());
     }
 
-    /**
-     * Tiêu diệt toàn bộ quái vật hung hãn trong bán kính radius blocks.
-     */
     public int killNearby(double radius) {
         List<Monster> monsters = nearbyMonsters(radius);
         for (Monster m : monsters) {
@@ -607,9 +538,6 @@ public abstract class QuickScript implements DynamicScript {
         return monsters.size();
     }
 
-    /**
-     * Gây sát thương lên người chơi hoặc thực thể.
-     */
     public double damage(double amount) {
         if (player != null) {
             player.damage(amount);
@@ -634,20 +562,11 @@ public abstract class QuickScript implements DynamicScript {
         return false;
     }
 
-    // ==========================================
-    // 5. CÁC HÀM ĐIỀU KHIỂN SERVER & LỆNH CONSOLE
-    // ==========================================
 
-    /**
-     * Thực thi lệnh trực tiếp với quyền Server Console.
-     */
     public boolean cmd(String commandLine) {
         return serverCtrl.executeConsoleCommand(commandLine);
     }
 
-    /**
-     * Bắt buộc người chơi chỉ định thực thi lệnh hoặc chat.
-     */
     public String sudo(Player target, String text) {
         if (target == null || text == null) return null;
         if (text.startsWith("/")) {
@@ -678,9 +597,6 @@ public abstract class QuickScript implements DynamicScript {
         return null;
     }
 
-    // ==========================================
-    // 6. BỘ PHÂN GIẢI THÔNG MINH (SMART RESOLVERS)
-    // ==========================================
 
     private Material parseMaterial(Object obj) {
         if (obj == null) return null;
@@ -735,12 +651,10 @@ public abstract class QuickScript implements DynamicScript {
         if (obj instanceof Particle p) return p;
         String name = String.valueOf(obj).trim().toLowerCase().replace(" ", "_").replace("minecraft:", "");
 
-        // 1. Kiểm tra trực tiếp theo tên enum
         try {
             return Particle.valueOf(name.toUpperCase());
         } catch (Throwable ignored) {}
 
-        // 2. Tra cứu alias phổ biến
         String mapped = switch (name) {
             case "flame", "fire" -> "FLAME";
             case "heart", "love" -> "HEART";
@@ -756,7 +670,6 @@ public abstract class QuickScript implements DynamicScript {
             return Particle.valueOf(mapped);
         } catch (Throwable ignored) {}
 
-        // 3. Thử hậu tố legacy (_NORMAL, _SPARK, v.v.)
         try {
             return Particle.valueOf(mapped + "_NORMAL");
         } catch (Throwable ignored) {}
@@ -856,9 +769,6 @@ public abstract class QuickScript implements DynamicScript {
         };
     }
 
-    // ==========================================
-    // 7. HIỂN THỊ CHỮ NỔI, SCOREBOARD & BOSSBAR (DISPLAY HELPERS)
-    // ==========================================
 
     public List<Entity> holo(String... lines) {
         return holo(location != null ? location : (player != null ? player.getLocation() : null), lines);
@@ -902,9 +812,6 @@ public abstract class QuickScript implements DynamicScript {
         return "Đã xóa BossBar!";
     }
 
-    // ==========================================
-    // 8. ĐIỀU KHIỂN THẾ GIỚI & KHÓA TRUY CẬP (WORLD HELPERS)
-    // ==========================================
 
     public World createWorld(String name, String env) {
         World.Environment e = World.Environment.NORMAL;
@@ -933,9 +840,6 @@ public abstract class QuickScript implements DynamicScript {
         return w.setGameRuleValue(rule, value);
     }
 
-    // ==========================================
-    // SMART GUI & ITEMBUILDER & VAULT SHORTCUTS
-    // ==========================================
 
     public com.javastudio.api.gui.SmartGui gui(String title, int rows) {
         return com.javastudio.api.gui.SmartGui.of(title, rows);
@@ -959,6 +863,42 @@ public abstract class QuickScript implements DynamicScript {
 
     public double ecoBalance() {
         return player != null ? com.javastudio.utils.VaultBridge.getBalance(player) : 0.0;
+    }
+
+    public com.javastudio.pipeline.FastBlockEngine fastBlock() {
+        return plugin != null ? plugin.getFastBlock() : null;
+    }
+
+    public com.javastudio.anticheat.AntiCheatManager antiCheat() {
+        return plugin != null ? plugin.getAntiCheatManager() : null;
+    }
+
+    public com.javastudio.security.cve.PanelCveProtectionSuite cveProtection() {
+        return plugin != null ? plugin.getPanelCveProtection() : null;
+    }
+
+    public com.javastudio.network.NettyPacketEngine netty() {
+        return plugin != null ? plugin.getNettyPacketEngine() : null;
+    }
+
+    public com.javastudio.ai.AiAssistant ai() {
+        return plugin != null ? plugin.getAiAssistant() : null;
+    }
+
+    public com.javastudio.bot.FakePlayerManager bots() {
+        return plugin != null ? plugin.getFakePlayerManager() : null;
+    }
+
+    public com.javastudio.pipeline.CircuitBreakerEngine breaker() {
+        return plugin != null ? plugin.getCircuitBreakerEngine() : null;
+    }
+
+    public com.javastudio.pipeline.VisualFlowEngine flow() {
+        return plugin != null ? plugin.getVisualFlowEngine() : null;
+    }
+
+    public com.javastudio.network.ClusterMeshEngine mesh() {
+        return plugin != null ? plugin.getClusterMeshEngine() : null;
     }
 }
 

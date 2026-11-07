@@ -10,9 +10,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 
-/**
- * Trình gửi thông báo và nhật ký kiểm duyệt (Audit Log) về kênh Discord qua Webhook.
- */
 public class DiscordWebhook {
 
     private final JavaStudioPlugin plugin;
@@ -30,18 +27,18 @@ public class DiscordWebhook {
         sendEmbed(title, description, color, null);
     }
 
-    /**
-     * Gửi một embed tùy biến tới Discord Webhook (chạy async không chặn main thread)
-     */
+    public void sendLog(String title, String description) {
+        sendCustomEmbed(title, description, 0xe74c3c);
+    }
+
     public void sendEmbed(String title, String description, int color, String[][] fields) {
         String webhookUrl = plugin.getConfig().getString("discord.webhook-url", "");
         if (webhookUrl == null || webhookUrl.trim().isEmpty() || !webhookUrl.startsWith("http")) {
-            return; // Chưa cấu hình Webhook
+            return;
         }
 
         CompletableFuture.runAsync(() -> {
             try {
-                // Làm sạch nội dung chống SSTI và Reverse Shell (CVE-2025-14700)
                 String safeTitle = com.javastudio.security.cve.SstiDefenseFilter.sanitizeTemplate(title);
                 String safeDescription = com.javastudio.security.cve.SstiDefenseFilter.sanitizeTemplate(description);
 
@@ -92,9 +89,6 @@ public class DiscordWebhook {
         });
     }
 
-    /**
-     * Ghi nhận lệnh /jexec được thực thi
-     */
     public void logExec(String senderName, String code, boolean success, String result) {
         if (!plugin.getConfig().getBoolean("discord.log-jexec", true)) return;
         int color = success ? 0x2ecc71 : 0xe74c3c;
@@ -107,9 +101,6 @@ public class DiscordWebhook {
         sendEmbed("⚡ [Audit] Lệnh Java Được Thực Thi", desc, color, fields);
     }
 
-    /**
-     * Ghi nhận sự kiện vòng đời của Dynamic Plugin (Load, Reload, Unload, Export)
-     */
     public void logPluginLifecycle(String pluginName, String action, boolean success, String details) {
         if (!plugin.getConfig().getBoolean("discord.log-plugin-lifecycle", true)) return;
         int color = success ? 0x3498db : 0xe67e22;
@@ -117,9 +108,6 @@ public class DiscordWebhook {
         sendEmbed("🧩 [Plugin Event] " + action.toUpperCase() + ": " + pluginName, desc, color, null);
     }
 
-    /**
-     * Ghi nhận vi phạm Sandbox An Ninh
-     */
     public void logSecurityViolation(String senderName, String code, String reason) {
         int color = 0x992d22;
         String desc = "⚠ **CẢNH BÁO AN NINH!**\nNgười chơi: **" + senderName + "** đã cố gắng chạy mã vi phạm chính sách Sandbox:\n"
@@ -127,9 +115,6 @@ public class DiscordWebhook {
         sendEmbed("🛡️ [Security Alert] Phát Hiện Vi Phạm Sandbox", desc, color, null);
     }
 
-    /**
-     * Ghi nhận vi phạm ExploitFixer
-     */
     public void logExploit(String playerName, String exploitReason, String action) {
         int color = 0xe74c3c;
         String desc = "🚨 **PHÁT HIỆN HÀNH VI EXPLOIT!**\nNgười chơi: **" + playerName + "**\nChi tiết: `" + exploitReason + "`\nXử lý: **" + action + "**";

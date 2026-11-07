@@ -15,11 +15,6 @@ import java.util.*;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
-/**
- * Bộ biên dịch Java trong Runtime sử dụng javax.tools.JavaCompiler (JDK).
- * Tự động tìm kiếm Classpath từ Minecraft Server (Paper/Purpur/Spigot),
- * các thư viện phụ thuộc và các plugin khác đang chạy.
- */
 public class RuntimeCompiler {
 
     private final JavaStudioPlugin plugin;
@@ -48,33 +43,21 @@ public class RuntimeCompiler {
         return inMemoryCompiler;
     }
 
-    /**
-     * Kiểm tra xem môi trường hiện tại có sẵn JavaCompiler không.
-     */
     public boolean isAvailable() {
         return compiler != null;
     }
 
-    /**
-     * Biên dịch 1 file source đơn lẻ trực tiếp từ chuỗi code trong RAM.
-     */
     public CompileResult compileSingleSource(String className, String sourceCode) {
         Map<String, String> map = new HashMap<>();
         map.put(className, sourceCode);
         return compileSources(map);
     }
 
-    /**
-     * Biên dịch danh sách nhiều file source trong RAM.
-     *
-     * @param sources Map từ tên class đầy đủ (vd: com.example.MyPlugin) đến nội dung code
-     */
     public CompileResult compileSources(Map<String, String> sources) {
         if (!isAvailable()) {
             return new CompileResult(false, null, Collections.emptyList(), null);
         }
 
-        // Kiểm tra an ninh Hộp Cát Sandbox trước khi đưa vào trình biên dịch
         if (plugin.getConfig().getBoolean("security.sandbox.enabled", true) && plugin.getSecuritySandbox() != null) {
             for (Map.Entry<String, String> entry : sources.entrySet()) {
                 String violation = plugin.getSecuritySandbox().validateCode(entry.getValue());
@@ -108,22 +91,32 @@ public class RuntimeCompiler {
 
         boolean success = Boolean.TRUE.equals(task.call());
         DynamicClassLoader loader = null;
+        Map<String, byte[]> compiledBytes = classFileManager.getAllByteCodes();
+
+        if (success && plugin.getConfig().getBoolean("security.sandbox.enabled", true) && plugin.getClassTaintEngine() != null) {
+            var taint = plugin.getClassTaintEngine().analyzeBytecodeMap(compiledBytes);
+            if (!taint.safe()) {
+                try {
+                    classFileManager.close();
+                } catch (IOException ignored) {}
+                String msg = String.join("; ", taint.violations());
+                logger.warning("[Bytecode Taint] Chặn nạp bytecode nguy hiểm: " + msg);
+                return CompileResult.securityFailure("[Bytecode Taint] " + msg);
+            }
+        }
 
         if (success) {
             loader = new DynamicClassLoader(plugin.getClass().getClassLoader());
-            loader.addByteCodes(classFileManager.getAllByteCodes());
+            loader.addByteCodes(compiledBytes);
         }
 
         try {
             classFileManager.close();
         } catch (IOException ignored) {}
 
-        return new CompileResult(success, classFileManager.getAllByteCodes(), diagnostics.getDiagnostics(), loader);
+        return new CompileResult(success, compiledBytes, diagnostics.getDiagnostics(), loader);
     }
 
-    /**
-     * Biên dịch toàn bộ mã nguồn trong thư mục source của một dynamic plugin project.
-     */
     public CompileResult compileDirectory(File srcDir) {
         if (!srcDir.exists() || !srcDir.isDirectory()) {
             return new CompileResult(false, null, Collections.emptyList(), null);
@@ -153,9 +146,6 @@ public class RuntimeCompiler {
         return compileSources(sources);
     }
 
-    /**
-     * Xây dựng danh sách tùy chọn cho JavaCompiler, bao gồm Classpath đầy đủ của Server.
-     */
     private List<String> buildCompilerOptions() {
         List<String> options = new ArrayList<>();
         options.add("-classpath");
@@ -163,7 +153,6 @@ public class RuntimeCompiler {
         options.add("-parameters");
         options.add("-Xlint:none");
 
-        // Tự động áp dụng --release tương thích toàn bộ Java 21+
         int targetRelease = plugin.getConfig().getInt("compiler.target-release", 21);
         int currentJvm = PlatformUtil.getJavaVersion();
         if (targetRelease >= 21 && targetRelease <= currentJvm) {
@@ -171,7 +160,6 @@ public class RuntimeCompiler {
             options.add(String.valueOf(targetRelease));
         }
 
-        // Tùy chọn bổ sung từ config
         List<String> extra = plugin.getConfig().getStringList("compiler.options");
         if (extra != null) {
             for (String opt : extra) {
@@ -184,12 +172,6 @@ public class RuntimeCompiler {
         return options;
     }
 
-    /**
-     * Thu thập và cache Classpath của server Minecraft:
-     * - java.class.path
-     * - Các jar trong thư mục plugins/
-     * - ClassLoader URLs
-     */
     public synchronized String getClasspath() {
         if (cachedClasspath != null) {
             return cachedClasspath;
@@ -197,13 +179,11 @@ public class RuntimeCompiler {
 
         Set<String> paths = new LinkedHashSet<>();
 
-        // 1. Trực tiếp trích xuất vị trí JAR của các class cốt lõi qua CodeSource (Hoạt động 100% trên Paper/Purpur/Spigot)
         addClassLocation(paths, org.bukkit.Bukkit.class);
         addClassLocation(paths, plugin.getServer().getClass());
         addClassLocation(paths, plugin.getClass());
         addClassLocation(paths, com.javastudio.api.DynamicPlugin.class);
 
-        // 2. Nạp vị trí JAR của toàn bộ các plugin khác đang chạy trên server (Vault, LuckPerms, ProtocolLib, WorldEdit,...)
         try {
             for (org.bukkit.plugin.Plugin p : plugin.getServer().getPluginManager().getPlugins()) {
                 if (p != null) {
@@ -212,7 +192,6 @@ public class RuntimeCompiler {
             }
         } catch (Throwable ignored) {}
 
-        // 3. System Classpath
         String sysPath = System.getProperty("java.class.path");
         if (sysPath != null && !sysPath.isEmpty()) {
             for (String part : sysPath.split(File.pathSeparator)) {
@@ -220,7 +199,6 @@ public class RuntimeCompiler {
             }
         }
 
-        // 4. ClassLoader hierarchy URLs nếu có
         ClassLoader cl = plugin.getClass().getClassLoader();
         while (cl != null) {
             if (cl instanceof URLClassLoader ucl) {
@@ -233,17 +211,14 @@ public class RuntimeCompiler {
             cl = cl.getParent();
         }
 
-        // 5. Thư mục libraries và bundler của Paper/Purpur (Mojmap / Modular Paperclip)
         addJarsRecursively(paths, new File("libraries"));
         addJarsRecursively(paths, new File("bundler"));
         addJarsRecursively(paths, new File("cache"));
 
-        // 6. Thư mục .cache/libraries của JavaStudio (Maven Dependencies)
         if (plugin.getDependencyResolver() != null) {
             addJarsRecursively(paths, plugin.getDependencyResolver().getCacheDir());
         }
 
-        // 7. Toàn bộ các plugin jar trong thư mục server "plugins"
         File pluginsDir = plugin.getDataFolder().getParentFile();
         if (pluginsDir != null && pluginsDir.exists() && pluginsDir.isDirectory()) {
             File[] pluginJars = pluginsDir.listFiles((dir, name) -> name.endsWith(".jar"));
@@ -278,7 +253,6 @@ public class RuntimeCompiler {
             if (files == null) return;
             for (File f : files) {
                 if (f.isDirectory()) {
-                    // Giới hạn độ sâu để tránh quét quá lâu
                     if (!f.getName().equals(".git")) {
                         addJarsRecursively(paths, f);
                     }
@@ -289,9 +263,6 @@ public class RuntimeCompiler {
         } catch (Throwable ignored) {}
     }
 
-    /**
-     * Xóa cache classpath để tính toán lại khi có plugin mới được thêm vào server.
-     */
     public synchronized void invalidateClasspathCache() {
         cachedClasspath = null;
         com.javastudio.pipeline.InMemoryJavaCompiler.clearCache();

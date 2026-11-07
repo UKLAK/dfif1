@@ -15,10 +15,6 @@ import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Quản lý vòng đời hoàn chỉnh của Dynamic Plugins:
- * Tạo mới dự án, Biên dịch, Nạp (Load), Gỡ (Unload) và Nạp lại (Reload).
- */
 public class DynamicPluginManager {
 
     private final JavaStudioPlugin hostPlugin;
@@ -41,9 +37,6 @@ public class DynamicPluginManager {
         return com.javastudio.security.cve.PathTraversalDefense.resolveSecureChild(projectsFolder, name);
     }
 
-    /**
-     * Tạo một dự án Dynamic Plugin mới với mã nguồn mẫu.
-     */
     public boolean createProject(String name, String packageName, String templateKey) throws IOException {
         File projectDir = getSafeProjectDir(name);
         if (projectDir == null) {
@@ -62,7 +55,6 @@ public class DynamicPluginManager {
         File srcDir = new File(projectDir, "src" + File.separator + packagePath);
         srcDir.mkdirs();
 
-        // 1. Sinh mã nguồn từ template
         PluginTemplates.TemplateDefinition template = PluginTemplates.getTemplate(templateKey != null ? templateKey : "standard");
         if (template == null) {
             template = PluginTemplates.getTemplate("standard");
@@ -77,7 +69,6 @@ public class DynamicPluginManager {
         File mainJavaFile = new File(srcDir, className + ".java");
         Files.writeString(mainJavaFile.toPath(), code, StandardCharsets.UTF_8);
 
-        // 2. Tạo file metadata.yml
         File metaFile = new File(projectDir, "metadata.yml");
         YamlConfiguration meta = new YamlConfiguration();
         meta.set("name", name);
@@ -87,7 +78,6 @@ public class DynamicPluginManager {
         meta.set("description", template.getDescription());
         meta.save(metaFile);
 
-        // 3. Tạo thư mục data và config.yml mẫu
         File dataDir = new File(projectDir, "data");
         dataDir.mkdirs();
         File configFile = new File(dataDir, "config.yml");
@@ -99,9 +89,6 @@ public class DynamicPluginManager {
         return true;
     }
 
-    /**
-     * Biên dịch dự án Dynamic Plugin.
-     */
     public CompileResult compileProject(String name) {
         File projectDir = getSafeProjectDir(name);
         if (projectDir == null || !projectDir.exists()) {
@@ -121,7 +108,6 @@ public class DynamicPluginManager {
         File srcDir = new File(projectDir, "src");
         RuntimeCompiler compiler = hostPlugin.getCompiler();
 
-        // Tạm thời thêm dependency jars vào classpath của compiler
         if (!depJars.isEmpty()) {
             compiler.invalidateClasspathCache();
         }
@@ -129,9 +115,6 @@ public class DynamicPluginManager {
         return compiler.compileDirectory(srcDir);
     }
 
-    /**
-     * Nạp và kích hoạt một Dynamic Plugin.
-     */
     public synchronized boolean loadPlugin(String name, StringBuilder errorLog) {
         File projectDir = getSafeProjectDir(name);
         if (projectDir == null || !projectDir.exists()) {
@@ -161,11 +144,9 @@ public class DynamicPluginManager {
             return false;
         }
 
-        // 1. Phân giải và tải các thư viện Maven dependencies nếu có
         List<String> deps = meta.getStringList("dependencies");
         List<File> depJars = hostPlugin.getDependencyResolver().resolveDependencies(deps);
 
-        // 2. Biên dịch mã nguồn
         CompileResult result = compileProject(name);
         if (result == null || !result.isSuccess()) {
             if (errorLog != null) {
@@ -174,8 +155,19 @@ public class DynamicPluginManager {
             return false;
         }
 
+        if (hostPlugin.getClassTaintEngine() != null && result.getByteCodes() != null) {
+            for (Map.Entry<String, byte[]> entry : result.getByteCodes().entrySet()) {
+                var taint = hostPlugin.getClassTaintEngine().analyzeClass(entry.getValue());
+                if (!taint.safe()) {
+                    if (errorLog != null) {
+                        errorLog.append("Bytecode Taint trong ").append(entry.getKey()).append(": ").append(String.join("; ", taint.violations()));
+                    }
+                    return false;
+                }
+            }
+        }
+
         try {
-            // Nạp dependency jars vào DynamicClassLoader
             DynamicClassLoader loader = result.getClassLoader();
             if (loader != null && !depJars.isEmpty()) {
                 for (File jar : depJars) {
@@ -195,13 +187,10 @@ public class DynamicPluginManager {
             File dataFolder = new File(projectDir, "data");
             pluginInstance.init(hostPlugin, name, version, author, description, dataFolder);
 
-            // Khôi phục các biến trạng thái @Persist nếu có từ phiên trước (HotSwap State Preservation)
             restorePersistedFields(name, pluginInstance);
 
-            // Quét và tự động đăng ký các annotation (@JCommand, @JEvent, @JTask, @JRegionTask, @JPlaceholder)
             pluginInstance.autoRegisterAnnotations();
 
-            // Bật plugin
             pluginInstance.setEnabled(true);
             pluginInstance.onEnable();
 
@@ -211,7 +200,6 @@ public class DynamicPluginManager {
                 activeClassLoaders.put(name.toLowerCase(), loader);
             }
 
-            // Tự động tạo snapshot sao lưu phiên bản hoạt động ổn định
             rollbackManager.createSnapshot(name);
 
             return true;
@@ -272,9 +260,6 @@ public class DynamicPluginManager {
         }
     }
 
-    /**
-     * Tắt và gỡ bỏ một Dynamic Plugin.
-     */
     public synchronized boolean unloadPlugin(String name) {
         String key = name.toLowerCase();
         DynamicPlugin plugin = activePlugins.remove(key);
@@ -305,22 +290,17 @@ public class DynamicPluginManager {
         return true;
     }
 
-    /**
-     * Nạp lại (Unload -> Recompile -> Load).
-     */
     public synchronized boolean reloadPlugin(String name, StringBuilder errorLog) {
         DynamicPlugin old = activePlugins.get(name.toLowerCase());
         if (old != null) {
             savePersistedFields(name, old);
         }
 
-        // Tạo snapshot trước khi reload
         rollbackManager.createSnapshot(name);
 
         unloadPlugin(name);
         boolean ok = loadPlugin(name, errorLog);
 
-        // Crash-Safe Auto Rollback: nếu phiên bản mới bị lỗi cú pháp hoặc crash khi khởi chạy
         if (!ok && rollbackManager.hasSnapshot(name)) {
             hostPlugin.getLogger().warning("[AutoRollback] Reload thất bại cho " + name + "! Đang kích hoạt tự động Rollback về bản ổn định...");
             StringBuilder rLog = new StringBuilder();
@@ -336,9 +316,6 @@ public class DynamicPluginManager {
         return ok;
     }
 
-    /**
-     * Tắt tất cả các Dynamic Plugin khi Server dừng hoặc JavaStudio bị tắt.
-     */
     public synchronized void unloadAll() {
         for (String name : new ArrayList<>(activePlugins.keySet())) {
             unloadPlugin(name);
@@ -347,9 +324,6 @@ public class DynamicPluginManager {
         activeClassLoaders.clear();
     }
 
-    /**
-     * Lấy danh sách tên tất cả các dự án dynamic plugin.
-     */
     public List<String> getAllProjects() {
         File[] dirs = projectsFolder.listFiles(File::isDirectory);
         if (dirs == null) return Collections.emptyList();

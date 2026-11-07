@@ -9,10 +9,6 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Trình thực thi kiểm thử đơn vị tự động (In-Game Unit Testing Runner).
- * Quét các hàm gắn annotation @Test trong DynamicPlugin và báo cáo kết quả.
- */
 public class DynamicTestRunner {
 
     public record TestResult(String methodName, String description, boolean passed, double elapsedMs, String error) {}
@@ -80,9 +76,6 @@ public class DynamicTestRunner {
         }
     }
 
-    /**
-     * Mô phỏng và bắn sự kiện giả lập (Headless Mock Event) vào plugin để kiểm thử phản hồi.
-     */
     public static TestResult simulateEvent(DynamicPlugin plugin, org.bukkit.event.Event event) {
         if (plugin == null || event == null) {
             return new TestResult("simulateEvent", "Mock Event", false, 0, "Plugin hoặc Event null");

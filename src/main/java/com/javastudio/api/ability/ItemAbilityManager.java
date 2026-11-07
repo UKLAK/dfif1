@@ -19,11 +19,6 @@ import org.bukkit.persistence.PersistentDataType;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Trình Quản Lý Kỹ Năng Vũ Khí & Vật Phẩm Tùy Biến (Item Ability Framework).
- * Cung cấp API trực tiếp cho các Dynamic Plugin tạo vũ khí RPG, kỹ năng đặc biệt
- * với hệ thống Hồi chiêu (Cooldown) và Persistent Data Container (PDC) tự động.
- */
 public final class ItemAbilityManager implements Listener {
 
     private final JavaStudioPlugin plugin;
@@ -37,9 +32,6 @@ public final class ItemAbilityManager implements Listener {
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
     }
 
-    /**
-     * Đăng ký một kỹ năng mới vào hệ thống.
-     */
     public void registerAbility(ItemAbility ability) {
         if (ability != null) {
             registeredAbilities.put(ability.getId().toLowerCase(), ability);
@@ -47,18 +39,12 @@ public final class ItemAbilityManager implements Listener {
         }
     }
 
-    /**
-     * Hủy đăng ký một kỹ năng.
-     */
     public void unregisterAbility(String id) {
         if (id != null) {
             registeredAbilities.remove(id.toLowerCase());
         }
     }
 
-    /**
-     * Gắn một kỹ năng vào vật phẩm (Sử dụng chuẩn PDC của Minecraft).
-     */
     public ItemStack applyAbility(ItemStack item, String abilityId) {
         if (item == null || abilityId == null || !item.hasItemMeta()) return item;
         ItemMeta meta = item.getItemMeta();
@@ -75,9 +61,6 @@ public final class ItemAbilityManager implements Listener {
         return item;
     }
 
-    /**
-     * Kiểm tra xem vật phẩm có chứa kỹ năng chỉ định hay không.
-     */
     public boolean hasAbility(ItemStack item, String abilityId) {
         if (item == null || abilityId == null || !item.hasItemMeta()) return false;
         ItemMeta meta = item.getItemMeta();
@@ -88,9 +71,6 @@ public final class ItemAbilityManager implements Listener {
         return Arrays.asList(current.split(";")).contains(abilityId.toLowerCase());
     }
 
-    /**
-     * Lấy danh sách ID các kỹ năng gắn trên vật phẩm.
-     */
     public List<String> getAbilities(ItemStack item) {
         if (item == null || !item.hasItemMeta()) return Collections.emptyList();
         ItemMeta meta = item.getItemMeta();
@@ -101,9 +81,6 @@ public final class ItemAbilityManager implements Listener {
         return Arrays.asList(current.split(";"));
     }
 
-    /**
-     * Kiểm tra thời gian hồi chiêu còn lại (tính theo giây).
-     */
     public double getRemainingCooldown(Player player, String abilityId) {
         if (player == null || abilityId == null) return 0.0;
         Map<String, Long> userCooldowns = cooldownMap.get(player.getUniqueId());
@@ -140,7 +117,6 @@ public final class ItemAbilityManager implements Listener {
 
             if (!ability.test(player, item)) continue;
 
-            // Kích hoạt
             ability.execute(player, item);
             if (ability.getCooldownSeconds() > 0) {
                 setCooldown(player, id, ability.getCooldownSeconds());
@@ -153,9 +129,6 @@ public final class ItemAbilityManager implements Listener {
         return activatedAny;
     }
 
-    // ==========================================
-    // CÁC LISTENER BẮT TRIGGER KỸ NĂNG
-    // ==========================================
 
     @EventHandler(priority = EventPriority.NORMAL)
     public void onInteract(PlayerInteractEvent event) {
